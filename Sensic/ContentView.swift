@@ -7,18 +7,24 @@
 
 import SwiftUI
 
-struct ContentView: View {
-    var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
-    }
+struct ContentView {
+//    var body: some View {
+//        TabView {
+//            HomeView()
+//                .tabItem { Label("الرئيسية", systemImage: "house.fill") }
+//
+//            CreationView()
+//                .tabItem { Label("إنشاء", systemImage: "plus.circle.fill") }
+//
+//            PiecesView()
+//                .tabItem { Label("القطع", systemImage: "music.note.list") }
+//
+//            AlbumsView()
+//                .tabItem { Label("الألبومات", systemImage: "square.stack.fill") }
+//        }
+//    }
 }
 
-#Preview {
-    ContentView()
-}
+//#Preview {
+//    ContentView()
+//}
