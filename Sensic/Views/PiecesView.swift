@@ -5,8 +5,10 @@
 
 import SwiftUI
 
-struct PiecesView{
-
+struct PiecesView: View {
+    var body: some View {
+        Text("القطع")
+    }
 }
 
 //#Preview {
