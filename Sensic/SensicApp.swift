@@ -9,9 +9,12 @@ import SwiftUI
 
 @main
 struct SensicApp: App {
+    private let store = RecordingsStore.shared
+
     var body: some Scene {
         WindowGroup {
-//            RootView()
+            HomeView(store: store)
+                .environment(store)
         }
     }
 }

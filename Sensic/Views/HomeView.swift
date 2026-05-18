@@ -6,91 +6,128 @@
 import SwiftUI
 
 struct HomeView: View {
+    @Bindable private var store: RecordingsStore
     @State private var viewModel: HomeViewModel
+    @State private var recordingsViewModel: RecordingsViewModel
 
     @MainActor
-    init() {
-        _viewModel = State(initialValue: HomeViewModel())
-    }
-
-    @MainActor
-    init(viewModel: HomeViewModel) {
-        _viewModel = State(initialValue: viewModel)
+    init(store: RecordingsStore = .shared) {
+        _store = Bindable(wrappedValue: store)
+        _viewModel = State(initialValue: HomeViewModel(store: store))
+        _recordingsViewModel = State(initialValue: RecordingsViewModel(store: store))
     }
 
     var body: some View {
-        ZStack {
-            SensicColors.background
-                .ignoresSafeArea()
+        NavigationStack {
+            ZStack {
+                SensicColors.background
+                    .ignoresSafeArea()
 
-            ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 28) {
                     HomeHeaderView()
+                        .fixedSize(horizontal: false, vertical: true)
 
                     PianoInstrumentCard()
+                        .fixedSize(horizontal: false, vertical: true)
 
                     VStack(alignment: .leading, spacing: 14) {
-                        RecordingsSectionHeader(showsSeeAll: viewModel.hasRecordings)
+                        RecordingsSectionHeader(
+                            showsSeeAll: viewModel.hasRecordings,
+                            onSeeAll: { viewModel.showRecordingsPage = true }
+                        )
 
                         recordingsPanel
                     }
+                    .layoutPriority(-1)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
-                .padding(.bottom, 32)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+                if let message = store.toastMessage {
+                    VStack {
+                        RecordingsToastView(message: message)
+                            .padding(.top, 8)
+                        Spacer()
+                    }
+                    .onAppear {
+                        Task {
+                            try? await Task.sleep(for: .seconds(2))
+                            store.clearToast()
+                        }
+                    }
+                }
+            }
+            .preferredColorScheme(.dark)
+            .toolbar(.hidden, for: .navigationBar)
+            .toolbar(.hidden, for: .tabBar)
+            .navigationDestination(isPresented: $viewModel.showRecordingsPage) {
+                RecordingsView(store: store, viewModel: recordingsViewModel)
+            }
+            .sheet(item: $viewModel.piecePendingRename) { piece in
+                RenameRecordingSheet(piece: piece, viewModel: recordingsViewModel)
+            }
+            .alert(
+                "Delete recording?",
+                isPresented: Binding(
+                    get: { viewModel.piecePendingDelete != nil },
+                    set: { if !$0 { viewModel.piecePendingDelete = nil } }
+                ),
+                presenting: viewModel.piecePendingDelete
+            ) { piece in
+                Button("Delete", role: .destructive) {
+                    viewModel.deletePiece(id: piece.id)
+                    viewModel.piecePendingDelete = nil
+                }
+                Button("Cancel", role: .cancel) {
+                    viewModel.piecePendingDelete = nil
+                }
+            } message: { piece in
+                Text("“\(piece.title)” will be removed from your library.")
+            }
+            .task {
+                await viewModel.load()
             }
         }
-        .preferredColorScheme(.dark)
-        .toolbar(.hidden, for: .navigationBar)
-        .toolbar(.hidden, for: .tabBar)
     }
 
     @ViewBuilder
     private var recordingsPanel: some View {
-        VStack(spacing: 14) {
-            if viewModel.showsRecordingActions {
-                RecordingActionBar()
-            }
-
-            Group {
-                if viewModel.hasRecordings {
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 10) {
-                            ForEach(viewModel.recordings) { piece in
-                                RecordingRowView(
-                                    piece: piece,
-                                    isSelected: viewModel.selectedRecordingID == piece.id
-                                )
-                                .onTapGesture {
-                                    viewModel.selectedRecordingID = piece.id
-                                }
-                            }
+        VStack(spacing: 0) {
+            if viewModel.hasRecordings {
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 10) {
+                        ForEach(viewModel.recentRecordings) { piece in
+                            SwipeableRecordingRow(
+                                piece: piece,
+                                revealedRecordingID: $viewModel.revealedRecordingID,
+                                onRename: { viewModel.piecePendingRename = piece },
+                                onAdd: { viewModel.showAlbumsComingSoon() },
+                                onDelete: { viewModel.piecePendingDelete = piece }
+                            )
                         }
                     }
-                } else {
-                    RecordingsEmptyState()
+                    .padding(16)
                 }
+            } else {
+                RecordingsEmptyState()
+                    .padding(16)
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: RecordingsPanelMetrics.contentHeight)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity)
+        .frame(height: RecordingsPanelMetrics.contentHeight)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(SensicColors.panelNavy)
         )
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 }
 
 #Preview("Empty") {
-    HomeView()
+    HomeView(store: RecordingsStore())
 }
 
 #Preview("List") {
-    HomeView(viewModel: .previewWithList)
-}
-
-#Preview("With actions") {
-    HomeView(viewModel: .previewWithActions)
+    HomeView(store: .previewInstance())
 }

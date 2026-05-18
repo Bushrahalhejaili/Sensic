@@ -25,7 +25,7 @@ struct HomeHeaderView: View {
             Spacer(minLength: 12)
 
             Button(action: onLibraryTap) {
-                Image(systemName: "square.stack.3d.up.fill")
+                Image(systemName: "square.stack")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(SensicColors.accentPurple)
                     .frame(width: 44, height: 44)
@@ -54,21 +54,24 @@ struct PianoInstrumentCard: View {
         HStack(alignment: .center, spacing: 14) {
             pianoIconCluster
 
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .center, spacing: 0) {
                 Text("Piano")
                     .font(.system(size: 26, weight: .bold))
                     .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, alignment: .center)
 
                 Text("Clear tactical pulses")
                     .font(.system(size: 14, weight: .regular))
                     .foregroundStyle(Color(red: 168 / 255, green: 172 / 255, blue: 190 / 255))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.top, 4)
 
                 GetStartedButton(action: onGetStarted)
                     .padding(.top, 14)
             }
-
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .center)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 16)
@@ -236,15 +239,20 @@ private struct RecordingActionButton: View {
     }
 }
 
-/// ارتفاع ثابت لمحتوى بطاقة التسجيلات (فارغة أو فيها قائمة)
+/// ارتفاع لوحة التسجيلات في الهوم — يتمدد لتحت فقط ولا يدفع الهيدر/البيانو لأعلى.
 enum RecordingsPanelMetrics {
-    static let contentHeight: CGFloat = 250
+    static let contentHeight: CGFloat = 420
 }
 
 struct RecordingsEmptyState: View {
     var body: some View {
         VStack(spacing: 12) {
-            WaveformBarsView(barColor: SensicColors.secondaryText.opacity(0.7), style: .empty)
+            WaveformBarsView(
+                barColor: SensicColors.secondaryText.opacity(0.7),
+                heights: WaveformBarsView.emptyPlaceholderHeights,
+                barWidth: 4,
+                spacing: 5
+            )
                 .frame(height: 32)
 
             Text("No pieces yet")
@@ -256,6 +264,131 @@ struct RecordingsEmptyState: View {
                 .foregroundStyle(SensicColors.secondaryText.opacity(0.85))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
+}
+
+struct SwipeableRecordingRow: View {
+    let piece: Piece
+    @Binding var revealedRecordingID: UUID?
+    var onRename: () -> Void = {}
+    var onAdd: () -> Void = {}
+    var onDelete: () -> Void = {}
+
+    private let actionWidth: CGFloat = 56
+    private let actionSpacing: CGFloat = 6
+    private var actionsRevealWidth: CGFloat { actionWidth * 3 + actionSpacing * 2 }
+
+    @State private var dragOffset: CGFloat = 0
+    @State private var isDraggingHorizontally = false
+
+    private var isRevealed: Bool { revealedRecordingID == piece.id }
+
+    private var rowOffset: CGFloat {
+        let settled = isRevealed ? -actionsRevealWidth : 0
+        return min(0, max(-actionsRevealWidth, settled + dragOffset))
+    }
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            HStack(spacing: actionSpacing) {
+                RecordingSwipeAction(
+                    title: "Rename",
+                    icon: "pencil",
+                    background: SensicColors.accentBlue,
+                    width: actionWidth,
+                    action: onRename
+                )
+                RecordingSwipeAction(
+                    title: "Add",
+                    icon: "folder",
+                    background: SensicColors.accentPurpleButton,
+                    width: actionWidth,
+                    action: onAdd
+                )
+                RecordingSwipeAction(
+                    title: "Delete",
+                    icon: "trash",
+                    background: SensicColors.accentRed,
+                    width: actionWidth,
+                    action: onDelete
+                )
+            }
+
+            RecordingRowView(piece: piece, isSelected: isRevealed)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .offset(x: rowOffset)
+                .gesture(swipeGesture)
+        }
+        .frame(maxWidth: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .animation(.spring(response: 0.35, dampingFraction: 0.82), value: isRevealed)
+        .animation(.spring(response: 0.35, dampingFraction: 0.82), value: dragOffset)
+    }
+
+    private var swipeGesture: some Gesture {
+        DragGesture(minimumDistance: 12, coordinateSpace: .local)
+            .onChanged { value in
+                let horizontal = abs(value.translation.width)
+                let vertical = abs(value.translation.height)
+
+                if !isDraggingHorizontally {
+                    guard horizontal > vertical else { return }
+                    isDraggingHorizontally = true
+                    if let openID = revealedRecordingID, openID != piece.id {
+                        revealedRecordingID = nil
+                    }
+                }
+
+                dragOffset = value.translation.width
+            }
+            .onEnded { value in
+                defer {
+                    isDraggingHorizontally = false
+                    dragOffset = 0
+                }
+
+                guard isDraggingHorizontally else { return }
+
+                let settled = isRevealed ? -actionsRevealWidth : 0
+                let projected = settled + value.translation.width
+
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                    if projected < -actionsRevealWidth / 2 {
+                        revealedRecordingID = piece.id
+                    } else if revealedRecordingID == piece.id {
+                        revealedRecordingID = nil
+                    }
+                }
+            }
+    }
+}
+
+struct RecordingSwipeAction: View {
+    let title: String
+    let icon: String
+    let background: Color
+    let width: CGFloat
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(.white)
+            .frame(width: width)
+            .frame(maxHeight: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(background)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -279,8 +412,9 @@ struct RecordingRowView: View {
             }
 
             HStack(spacing: 8) {
-                WaveformBarsView(barColor: .white.opacity(0.85), style: .compact)
+                WaveformBarsView(barColor: .white.opacity(0.85), heights: piece.waveformHeights)
                     .frame(height: 18)
+                    .id(piece.id)
 
                 Text(piece.formattedDuration)
                     .font(.system(size: 13, weight: .regular))
@@ -300,29 +434,19 @@ struct RecordingRowView: View {
 }
 
 struct WaveformBarsView: View {
-    enum Style {
-        case empty
-        case compact
-    }
+    static let emptyPlaceholderHeights: [CGFloat] = [0.35, 0.55, 0.75, 0.45, 0.6]
 
     let barColor: Color
-    var style: Style = .compact
-
-    private var heights: [CGFloat] {
-        switch style {
-        case .empty:
-            [0.35, 0.55, 0.75, 0.45, 0.6]
-        case .compact:
-            [0.4, 0.65, 0.5, 0.8, 0.55, 0.7, 0.45, 0.6, 0.75, 0.5, 0.65, 0.4]
-        }
-    }
+    let heights: [CGFloat]
+    var barWidth: CGFloat = 2.5
+    var spacing: CGFloat = 2
 
     var body: some View {
-        HStack(alignment: .center, spacing: style == .empty ? 5 : 2) {
+        HStack(alignment: .center, spacing: spacing) {
             ForEach(Array(heights.enumerated()), id: \.offset) { _, height in
                 Capsule()
                     .fill(barColor)
-                    .frame(width: style == .empty ? 4 : 2.5, height: 28 * height)
+                    .frame(width: barWidth, height: 28 * height)
             }
         }
     }

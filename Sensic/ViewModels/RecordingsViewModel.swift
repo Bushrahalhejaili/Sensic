@@ -1,5 +1,5 @@
 //
-//  HomeViewModel.swift
+//  RecordingsViewModel.swift
 //  Sensic
 //
 
@@ -8,21 +8,19 @@ import Observation
 
 @Observable
 @MainActor
-final class HomeViewModel {
+final class RecordingsViewModel {
     private let store: RecordingsStore
 
+    var searchText = ""
     var revealedRecordingID: UUID?
-    var showRecordingsPage = false
+    var isLoading = false
 
     var piecePendingRename: Piece?
     var piecePendingDelete: Piece?
 
-    var recordings: [Piece] { store.pieces }
-    var hasRecordings: Bool { !store.pieces.isEmpty }
-
-    /// Latest 5 recordings for the home panel (newest first).
-    var recentRecordings: [Piece] {
-        Array(recordings.prefix(5))
+    var toastMessage: String? {
+        get { store.toastMessage }
+        set { store.toastMessage = newValue }
     }
 
     init(store: RecordingsStore = .shared) {
@@ -30,7 +28,9 @@ final class HomeViewModel {
     }
 
     func load() async {
+        isLoading = true
         await store.loadIfNeeded()
+        isLoading = false
     }
 
     func renamePiece(id: UUID, title: String) -> Bool {
@@ -47,7 +47,12 @@ final class HomeViewModel {
         }
     }
 
+    /// Albums are not implemented yet — placeholder for Add/Move actions.
     func showAlbumsComingSoon() {
         store.showToast("Albums coming soon")
+    }
+
+    func clearToast() {
+        store.clearToast()
     }
 }
