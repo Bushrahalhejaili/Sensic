@@ -11,7 +11,7 @@ import SwiftUI
 struct SensicApp: App {
     var body: some Scene {
         WindowGroup {
-//            RootView()
+            CreationView()
         }
     }
 }
