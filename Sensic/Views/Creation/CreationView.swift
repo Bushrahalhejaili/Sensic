@@ -1,12 +1,12 @@
-// CreationView.swift
-// Sensic
+//
+//  CreationView.swift
+//  Sensic
+//
 
 import SwiftUI
 import CoreHaptics
 
-// ─────────────────────────────────────────────
 // MARK: - Haptic Engine
-// ─────────────────────────────────────────────
 
 final class HapticEngine {
     static let shared = HapticEngine()
@@ -27,151 +27,323 @@ final class HapticEngine {
         let s = CHHapticEventParameter(parameterID: .hapticSharpness, value: sharpness)
         let event = CHHapticEvent(eventType: .hapticTransient, parameters: [i, s], relativeTime: 0)
         guard let pattern = try? CHHapticPattern(events: [event], parameters: []),
-              let player  = try? engine.makePlayer(with: pattern) else { return }
+              let player = try? engine.makePlayer(with: pattern) else { return }
         try? player.start(atTime: CHHapticTimeImmediate)
     }
 }
 
-// ─────────────────────────────────────────────
 // MARK: - CreationView
-// ─────────────────────────────────────────────
 
 struct CreationView: View {
-    @StateObject private var recordVM   = RecordViewModel()
+    @Environment(\.dismiss) private var dismiss
+    @Bindable var store: RecordingsStore
+    var onSavedToRecordings: (() -> Void)?
+
+    @StateObject private var recordVM = RecordViewModel()
     @StateObject private var practiceVM = PracticeViewModel()
-    @State private var activeTab: Tab   = .record
-    @State private var showNewSession   = false
-    @State private var newTitle         = ""
+    @StateObject private var scrollState = PianoScrollState()
+
+    @State private var activeTab: Tab = .record
+    @State private var showSettings = false
+    @State private var showSaveDialog = false
+    @State private var showSaveError = false
+    @State private var showExitDialog = false
+    @State private var saveErrorMessage = ""
+    @State private var saveTitle = ""
+    @State private var saveNavigatesToRecordings = true
+
     @State private var hapticIntensity: Float = 0.7
     @State private var hapticSharpness: Float = 0.5
     @State private var hapticStyle: HapticStyle = .smooth
 
-    enum Tab { case record, practice }
+    enum Tab: Hashable { case record, practice }
 
     var body: some View {
         ZStack {
             SensicColors.background.ignoresSafeArea()
+
             VStack(spacing: 0) {
                 headerBar
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 14)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 8)
 
                 if activeTab == .record {
-                    recordContent
+                    recordWorkspace
                 } else {
                     PracticeView(vm: practiceVM)
                 }
             }
+
+            if showSaveDialog {
+                Color.black.opacity(0.55)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+
+                EnterNameGlassAlert(
+                    title: $saveTitle,
+                    onSave: {
+                        showSaveDialog = false
+                        persistRecording(title: saveTitle, navigateToRecordings: saveNavigatesToRecordings)
+                    },
+                    onCancel: { showSaveDialog = false }
+                )
+                .padding(.horizontal, 24)
+                .transition(.scale(scale: 0.94).combined(with: .opacity))
+            }
         }
-        .sheet(isPresented: $showNewSession) {
-            NewSessionSheet(title: $newTitle) {
-                recordVM.startRecording(title: newTitle)
-                newTitle = ""
-                showNewSession = false
-            } onCancel: { showNewSession = false }
+        .animation(.spring(response: 0.38, dampingFraction: 0.86), value: showSaveDialog)
+        .preferredColorScheme(.dark)
+        .toolbar(.hidden, for: .navigationBar)
+        .alert("Cannot save", isPresented: $showSaveError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(saveErrorMessage)
+        }
+        .confirmationDialog(
+            "Unsaved recording",
+            isPresented: $showExitDialog,
+            titleVisibility: .visible
+        ) {
+            Button("Save") {
+                saveNavigatesToRecordings = false
+                prepareSaveTitle()
+                showSaveDialog = true
+            }
+            Button("Delete", role: .destructive) {
+                recordVM.discardRecording()
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Do you want to save this recording or delete it?")
         }
     }
 
-    // ─────────────────────────────────────────
     // MARK: - Header
-    // ─────────────────────────────────────────
 
     private var headerBar: some View {
-        HStack {
-            Button { } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(SensicColors.accentPurple)
-            }
-            Spacer()
-            HStack(spacing: 2) {
-                tabBtn("Record",   .record)
-                tabBtn("Practice", .practice)
-            }
-            .padding(4)
-            .background(SensicColors.panelNavy)
-            .clipShape(Capsule())
-            Spacer()
-            Button {
-                if recordVM.isRecording {
-                    if let session = recordVM.stopRecording() {
-                        practiceVM.addSession(session)
-                    }
-                } else {
-                    showNewSession = true
-                }
-            } label: {
-                Image(systemName: recordVM.isRecording ? "checkmark" : "plus")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 34, height: 34)
-                    .background(recordVM.isRecording ? Color.green.opacity(0.8) : SensicColors.accentPurple)
-                    .clipShape(Circle())
-            }
-        }
-    }
-
-    private func tabBtn(_ label: String, _ tab: Tab) -> some View {
-        Button(label) { withAnimation(.easeInOut(duration: 0.15)) { activeTab = tab } }
-            .font(.subheadline.weight(.medium))
-            .padding(.vertical, 7).padding(.horizontal, 18)
-            .background(activeTab == tab ? SensicColors.accentPurple : Color.clear)
-            .foregroundStyle(activeTab == tab ? .white : SensicColors.secondaryText)
-            .clipShape(Capsule())
-    }
-
-    // ─────────────────────────────────────────
-    // MARK: - Record Content
-    // ─────────────────────────────────────────
-
-    private var recordContent: some View {
-        VStack(spacing: 12) {
-            TimelineView(
-                isRecording: recordVM.isRecording,
-                noteHistory: recordVM.noteHistory,
-                elapsed: recordVM.elapsedSeconds
+        HStack(spacing: 12) {
+            SensicGlassCircleButton(
+                systemName: "chevron.left",
+                iconColor: SensicColors.accentPurple,
+                action: attemptGoBack
             )
-            .frame(height: 90)
-            .padding(.horizontal, 16)
-
-            HapticControlsView(
-                intensity: $hapticIntensity,
-                sharpness: $hapticSharpness,
-                style: $hapticStyle
-            )
-            .padding(.horizontal, 16)
-
-            HStack {
-                if recordVM.isRecording {
-                    Text(recordVM.formattedTime)
-                        .font(.system(size: 22, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.white)
-                    Spacer()
-                    Button("Discard") { recordVM.discardRecording() }
-                        .font(.subheadline).foregroundStyle(SensicColors.secondaryText)
-                } else {
-                    Spacer()
-                    Button { showNewSession = true } label: {
-                        Label("Start recording", systemImage: "record.circle")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(SensicColors.accentPurple)
-                    }
-                    Spacer()
-                }
-            }
-            .padding(.horizontal, 20)
 
             Spacer(minLength: 0)
 
+            SensicGlassSegmentPicker(
+                tabs: [(.record, "Record"), (.practice, "Practice")],
+                selection: $activeTab
+            )
+
+            Spacer(minLength: 0)
+
+            if activeTab == .record {
+                SensicGlassCircleButton(
+                    systemName: "checkmark",
+                    iconColor: SensicColors.accentPurple,
+                    action: presentSaveSheet
+                )
+            } else {
+                Color.clear
+                    .frame(width: 44, height: 44)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+
+    // MARK: - Workspace (matches Figma)
+
+    private var recordWorkspace: some View {
+        VStack(spacing: 0) {
+            toolBar
+                .padding(.horizontal, 16)
+                .padding(.bottom, 10)
+
+            if showSettings {
+                HapticControlsView(
+                    intensity: $hapticIntensity,
+                    sharpness: $hapticSharpness,
+                    style: $hapticStyle
+                )
+                .padding(.horizontal, 16)
+                .padding(.bottom, 10)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
+            TimelineView(
+                isRecording: recordVM.isRecording,
+                noteHistory: recordVM.eventsForPlayback,
+                elapsed: recordVM.elapsedSeconds
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .layoutPriority(1)
+
             PianoWithMinimap(
                 vm: recordVM,
+                scrollState: scrollState,
                 hapticIntensity: hapticIntensity,
                 hapticSharpness: hapticSharpness,
                 hapticStyle: hapticStyle
             )
+            .frame(height: CreationLayout.pianoBlockHeight)
         }
-        .padding(.top, 8)
+        .animation(.spring(response: 0.38, dampingFraction: 0.86), value: showSettings)
+    }
+
+    private var toolBar: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 10) {
+                SensicGlassCircleButton(
+                    systemName: "arrow.uturn.backward",
+                    iconColor: SensicColors.accentPurple,
+                    action: { recordVM.undo() }
+                )
+                .opacity(recordVM.canUndo ? 1 : 0.35)
+                .disabled(!recordVM.canUndo)
+
+                SensicGlassCircleButton(
+                    systemName: "arrow.uturn.forward",
+                    iconColor: SensicColors.accentPurple,
+                    action: { recordVM.redo() }
+                )
+                .opacity(recordVM.canRedo ? 1 : 0.35)
+                .disabled(!recordVM.canRedo)
+            }
+
+            Spacer(minLength: 0)
+
+            HStack(spacing: 10) {
+                SensicGlassCircleButton(
+                    systemName: "slider.horizontal.3",
+                    isActive: showSettings,
+                    action: {
+                        withAnimation(.spring(response: 0.38, dampingFraction: 0.86)) {
+                            showSettings.toggle()
+                        }
+                    }
+                )
+
+                transportBar
+            }
+        }
+    }
+
+    private var transportBar: some View {
+        SensicGlassTransportBar {
+            HStack(spacing: 18) {
+                transportIcon("backward.end.fill") {}
+                transportIcon("forward.end.fill") {}
+
+                transportIcon("stop.fill") {
+                    recordVM.stopPlayback()
+                    if recordVM.isRecording {
+                        _ = recordVM.stopRecording()
+                    }
+                }
+
+                transportIcon(recordVM.isPlaying ? "pause.fill" : "play.fill") {
+                    recordVM.togglePlayback()
+                }
+                .opacity(recordVM.canSave ? 1 : 0.35)
+                .disabled(!recordVM.canSave)
+
+                Button {
+                    toggleRecording()
+                } label: {
+                    Image(systemName: "circle.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(recordVM.isRecording ? SensicColors.accentRed : .white)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func transportIcon(_ name: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: name)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func toggleRecording() {
+        if recordVM.isRecording {
+            _ = recordVM.stopRecording()
+        } else {
+            recordVM.startRecording()
+        }
+    }
+
+    // MARK: - Navigation & save
+
+    private func attemptGoBack() {
+        if activeTab == .practice {
+            dismiss()
+            return
+        }
+
+        if recordVM.hasUnsavedWork {
+            showExitDialog = true
+        } else {
+            dismiss()
+        }
+    }
+
+    private func presentSaveSheet() {
+        saveNavigatesToRecordings = true
+        if recordVM.isRecording {
+            _ = recordVM.stopRecording()
+        }
+
+        guard recordVM.canSave else {
+            saveErrorMessage = "Nothing recorded yet. Record notes before saving."
+            showSaveError = true
+            return
+        }
+
+        prepareSaveTitle()
+        showSaveDialog = true
+    }
+
+    private func prepareSaveTitle() {
+        saveTitle = recordVM.sessionTitle
+    }
+
+    private func persistRecording(title: String, navigateToRecordings: Bool) {
+        if recordVM.isRecording {
+            _ = recordVM.stopRecording()
+        }
+
+        guard recordVM.canSave else {
+            saveErrorMessage = "Nothing recorded yet. Record notes before saving."
+            showSaveError = true
+            return
+        }
+
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        store.savePiece(
+            title: trimmed,
+            duration: recordVM.sessionDuration,
+            noteEvents: recordVM.eventsForPlayback
+        )
+        store.showToast("Saved to Recordings")
+        recordVM.discardRecording()
+
+        if navigateToRecordings {
+            dismiss()
+            onSavedToRecordings?()
+        } else {
+            dismiss()
+        }
     }
 }
 
-#Preview { CreationView() }
+#Preview {
+    CreationView(store: .previewInstance())
+}

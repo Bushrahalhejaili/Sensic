@@ -5,10 +5,16 @@
 
 import SwiftUI
 
+private enum HomeDestination: Hashable {
+    case creation
+    case recordings
+}
+
 struct HomeView: View {
     @Bindable private var store: RecordingsStore
     @State private var viewModel: HomeViewModel
     @State private var recordingsViewModel: RecordingsViewModel
+    @State private var navigationPath = NavigationPath()
 
     @MainActor
     init(store: RecordingsStore = .shared) {
@@ -18,7 +24,7 @@ struct HomeView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             ZStack {
                 SensicColors.background
                     .ignoresSafeArea()
@@ -27,13 +33,13 @@ struct HomeView: View {
                     HomeHeaderView()
                         .fixedSize(horizontal: false, vertical: true)
 
-                    PianoInstrumentCard()
+                    PianoInstrumentCard(openCreation: openCreation)
                         .fixedSize(horizontal: false, vertical: true)
 
                     VStack(alignment: .leading, spacing: 14) {
                         RecordingsSectionHeader(
                             showsSeeAll: viewModel.hasRecordings,
-                            onSeeAll: { viewModel.showRecordingsPage = true }
+                            onSeeAll: openRecordings
                         )
 
                         recordingsPanel
@@ -61,8 +67,13 @@ struct HomeView: View {
             .preferredColorScheme(.dark)
             .toolbar(.hidden, for: .navigationBar)
             .toolbar(.hidden, for: .tabBar)
-            .navigationDestination(isPresented: $viewModel.showRecordingsPage) {
-                RecordingsView(store: store, viewModel: recordingsViewModel)
+            .navigationDestination(for: HomeDestination.self) { destination in
+                switch destination {
+                case .creation:
+                    CreationView(store: store, onSavedToRecordings: openRecordingsAfterSave)
+                case .recordings:
+                    RecordingsView(store: store, viewModel: recordingsViewModel)
+                }
             }
             .sheet(item: $viewModel.piecePendingRename) { piece in
                 RenameRecordingSheet(piece: piece, viewModel: recordingsViewModel)
@@ -89,6 +100,21 @@ struct HomeView: View {
                 await viewModel.load()
             }
         }
+    }
+
+    private func openCreation() {
+        navigationPath.append(HomeDestination.creation)
+    }
+
+    private func openRecordings() {
+        navigationPath.append(HomeDestination.recordings)
+    }
+
+    private func openRecordingsAfterSave() {
+        if navigationPath.count > 0 {
+            navigationPath.removeLast()
+        }
+        navigationPath.append(HomeDestination.recordings)
     }
 
     @ViewBuilder

@@ -11,7 +11,7 @@
 
 import Foundation
 
-struct NoteEvent: Codable {
+struct NoteEvent: Codable, Equatable {
     var midiNote:  UInt8
     var velocity:  UInt8
     var timestamp: TimeInterval   // ثواني من بداية السشن

@@ -45,7 +45,7 @@ struct HomeHeaderView: View {
 // بطاقة الآلة (Piano) — التصميم من Figma: أيقونة يسار + نص وزر يمين
 
 struct PianoInstrumentCard: View {
-    var onGetStarted: () -> Void = {}
+    var openCreation: () -> Void = {}
 
     /// نصف قطر زوايا البطاقة الخارجية
     private let cardCorner: CGFloat = 24
@@ -68,7 +68,7 @@ struct PianoInstrumentCard: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.top, 4)
 
-                GetStartedButton(action: onGetStarted)
+                GetStartedButton(action: openCreation)
                     .padding(.top, 14)
             }
             .frame(maxWidth: .infinity, alignment: .center)
@@ -77,6 +77,8 @@ struct PianoInstrumentCard: View {
         .padding(.vertical, 16)
         .background(cardBackground)
         .overlay(cardBorder)
+        .contentShape(RoundedRectangle(cornerRadius: cardCorner, style: .continuous))
+        .onTapGesture(perform: openCreation)
     }
 
 //MARK: -Piaon Image section

@@ -61,7 +61,7 @@ func blackKeyOffset(_ midi: UInt8) -> CGFloat? {
 // ─────────────────────────────────────────────
 
 class PianoUIView: UIView {
-    var onNoteOn:  ((UInt8) -> Void)?
+    var onNoteOn:  ((UInt8, UInt8) -> Void)?
     var onNoteOff: ((UInt8) -> Void)?
     var activeNotes = Set<UInt8>() { didSet { setNeedsDisplay() } }
     private var touchToMidi: [UITouch: UInt8] = [:]
@@ -109,7 +109,10 @@ class PianoUIView: UIView {
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         for t in touches {
-            if let m = midiAt(t.location(in: self)) { touchToMidi[t] = m; onNoteOn?(m) }
+            if let m = midiAt(t.location(in: self)) {
+                touchToMidi[t] = m
+                onNoteOn?(m, touchVelocity(t))
+            }
         }
     }
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -117,7 +120,12 @@ class PianoUIView: UIView {
             let curr = midiAt(t.location(in: self)); let prev = touchToMidi[t]
             if curr != prev {
                 if let p = prev { onNoteOff?(p) }
-                if let c = curr { touchToMidi[t] = c; onNoteOn?(c) } else { touchToMidi[t] = nil }
+                if let c = curr {
+                    touchToMidi[t] = c
+                    onNoteOn?(c, touchVelocity(t))
+                } else {
+                    touchToMidi[t] = nil
+                }
             }
         }
     }
@@ -136,6 +144,14 @@ class PianoUIView: UIView {
             if CGRect(x: CGFloat(i) * (wKW + 1.5), y: 0, width: wKW, height: wKH).contains(pt) { return key.midi }
         }
         return nil
+    }
+
+    private func touchVelocity(_ touch: UITouch) -> UInt8 {
+        if touch.maximumPossibleForce > 0, touch.force > 0 {
+            let normalized = min(1, touch.force / touch.maximumPossibleForce)
+            return UInt8(48 + normalized * 79)
+        }
+        return 88
     }
 }
 
@@ -160,16 +176,17 @@ class PianoScrollUIView: UIScrollView, UIGestureRecognizerDelegate {
 
 struct PianoSection: UIViewRepresentable {
     @ObservedObject var vm: RecordViewModel
+    @ObservedObject var scrollState: PianoScrollState
     let hapticIntensity: Float
     let hapticSharpness: Float
     let hapticStyle: HapticStyle
 
     func makeUIView(context: Context) -> PianoScrollUIView {
-        let totalW = CGFloat(whitePianoKeys.count) * (wKW + 1.5)
-        let piano  = PianoUIView(frame: CGRect(x: 0, y: 0, width: totalW, height: wKH))
-        piano.onNoteOn = { midi in
+        let totalW = PianoScrollState.totalContentWidth
+        let piano = PianoUIView(frame: CGRect(x: 0, y: 0, width: totalW, height: wKH))
+        piano.onNoteOn = { midi, velocity in
             DispatchQueue.main.async {
-                vm.noteOn(midi: midi)
+                vm.noteOn(midi: midi, velocity: velocity)
                 let i = hapticStyle == .punchy ? min(1, hapticIntensity * 1.4) : hapticIntensity
                 HapticEngine.shared.play(intensity: i, sharpness: hapticSharpness)
             }
@@ -179,12 +196,19 @@ struct PianoSection: UIViewRepresentable {
 
         let scroll = PianoScrollUIView()
         scroll.showsHorizontalScrollIndicator = false
-        scroll.showsVerticalScrollIndicator   = false
+        scroll.showsVerticalScrollIndicator = false
         scroll.backgroundColor = UIColor(red: 0.05, green: 0.04, blue: 0.1, alpha: 1)
         scroll.canCancelContentTouches = false
-        scroll.delaysContentTouches    = false
+        scroll.delaysContentTouches = false
+        scroll.delegate = context.coordinator
         scroll.addSubview(piano)
         scroll.contentSize = CGSize(width: totalW, height: wKH)
+        context.coordinator.scrollState = scrollState
+        scrollState.scrollView = scroll
+        DispatchQueue.main.async {
+            scrollState.viewportWidth = scroll.bounds.width
+            scrollState.setOffset(scrollState.offset)
+        }
         return scroll
     }
 
@@ -193,7 +217,18 @@ struct PianoSection: UIViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
-    class Coordinator { var pianoView: PianoUIView? }
+
+    final class Coordinator: NSObject, UIScrollViewDelegate {
+        var pianoView: PianoUIView?
+        weak var scrollState: PianoScrollState?
+
+        func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            Task { @MainActor in
+                scrollState?.offset = scrollView.contentOffset.x
+                scrollState?.viewportWidth = scrollView.bounds.width
+            }
+        }
+    }
 }
 
 // ─────────────────────────────────────────────
@@ -202,33 +237,273 @@ struct PianoSection: UIViewRepresentable {
 
 struct PianoWithMinimap: View {
     @ObservedObject var vm: RecordViewModel
+    @ObservedObject var scrollState: PianoScrollState
     let hapticIntensity: Float
     let hapticSharpness: Float
     let hapticStyle: HapticStyle
 
+    @State private var dragStartNormalized: CGFloat = 0
+    @State private var isDraggingViewport = false
+
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 1) {
-                ForEach(whitePianoKeys) { key in
-                    Rectangle()
-                        .fill(vm.activeNotes.contains(key.midi)
-                              ? SensicColors.accentPurple
-                              : SensicColors.accentPurple.opacity(key.noteName == "C" ? 0.25 : 0.07))
-                        .frame(height: 4)
-                }
-            }
-            .padding(.horizontal, 12).padding(.vertical, 5)
-            .background(SensicColors.cardNavy)
-            .animation(.easeOut(duration: 0.05), value: vm.activeNotes)
+            minimapNavigator
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 8)
 
-            PianoSection(vm: vm, hapticIntensity: hapticIntensity,
-                         hapticSharpness: hapticSharpness, hapticStyle: hapticStyle)
-                .frame(height: wKH + 10)
-                .overlay(alignment: .top) {
-                    Rectangle().fill(SensicColors.accentPurple.opacity(0.2)).frame(height: 1)
-                }
+            PianoSection(
+                vm: vm,
+                scrollState: scrollState,
+                hapticIntensity: hapticIntensity,
+                hapticSharpness: hapticSharpness,
+                hapticStyle: hapticStyle
+            )
+            .frame(height: wKH + 10)
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(SensicColors.accentPurple.opacity(0.2))
+                    .frame(height: 1)
+            }
         }
         .background(SensicColors.cardNavy)
+    }
+
+    private var minimapNavigator: some View {
+        GeometryReader { geo in
+            let inset: CGFloat = 6
+            let mapWidth = geo.size.width - inset * 2
+            let barHeight = geo.size.height - inset * 2
+            let viewportRatio = min(1, scrollState.viewportWidth / PianoScrollState.totalContentWidth)
+            let viewportWidth = max(52, mapWidth * viewportRatio)
+            let travel = max(0, mapWidth - viewportWidth)
+            let viewportX = inset + travel * scrollState.normalizedOffset
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color(red: 8 / 255, green: 10 / 255, blue: 22 / 255))
+                    .overlay(
+                        Capsule()
+                            .stroke(SensicColors.accentPurple.opacity(0.85), lineWidth: 1.5)
+                    )
+
+                HStack(spacing: 2) {
+                    ForEach(whitePianoKeys) { key in
+                        Capsule()
+                            .fill(minimapKeyColor(for: key))
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .padding(.horizontal, inset + 8)
+                .padding(.vertical, inset + 4)
+                .frame(height: barHeight)
+
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.white.opacity(0.55), lineWidth: 1.5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.white.opacity(0.08))
+                    )
+                    .frame(width: viewportWidth, height: barHeight)
+                    .offset(x: viewportX)
+                    .shadow(color: SensicColors.accentPurple.opacity(0.35), radius: 6, y: 0)
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                guard travel > 0 else { return }
+                                if !isDraggingViewport {
+                                    isDraggingViewport = true
+                                    dragStartNormalized = scrollState.normalizedOffset
+                                }
+                                let delta = value.translation.width / travel
+                                scrollState.setNormalizedOffset(
+                                    min(1, max(0, dragStartNormalized + delta)),
+                                    animated: false
+                                )
+                            }
+                            .onEnded { _ in
+                                isDraggingViewport = false
+                            }
+                    )
+            }
+            .contentShape(Capsule())
+            .onTapGesture { location in
+                guard travel > 0 else { return }
+                let localX = location.x - inset - viewportWidth / 2
+                let target = min(1, max(0, localX / travel))
+                scrollState.setNormalizedOffset(target, animated: true)
+            }
+        }
+        .frame(height: 44)
+        .animation(.easeOut(duration: 0.05), value: vm.activeNotes)
+    }
+
+    private func minimapKeyColor(for key: PianoKeyModel) -> Color {
+        if vm.activeNotes.contains(key.midi) {
+            return SensicColors.accentPurple
+        }
+        if key.noteName == "C" {
+            return Color.white.opacity(0.95)
+        }
+        return SensicColors.accentPurple.opacity(0.72)
+    }
+}
+
+// MARK: - Glass chrome
+
+enum CreationLayout {
+    static let pianoBlockHeight: CGFloat = wKH + 10 + 44 + 12
+}
+
+struct SensicGlassCircleButton: View {
+    let systemName: String
+    var isActive: Bool = false
+    var activeTint: Color = SensicColors.accentPurple
+    var iconColor: Color = .white
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(isActive ? .white : iconColor)
+                .frame(width: 44, height: 44)
+                .background {
+                    if isActive {
+                        Circle().fill(activeTint)
+                    } else {
+                        Circle().fill(.clear)
+                    }
+                }
+                .glassEffect(in: .circle)
+                .overlay(
+                    Circle()
+                        .stroke(Color.white.opacity(isActive ? 0 : 0.12), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct SensicGlassSegmentPicker<Tab: Hashable>: View {
+    let tabs: [(tab: Tab, title: String)]
+    @Binding var selection: Tab
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(tabs, id: \.tab) { item in
+                Button(item.title) {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        selection = item.tab
+                    }
+                }
+                .font(.system(size: 15, weight: .semibold))
+                .padding(.vertical, 8)
+                .padding(.horizontal, 18)
+                .foregroundStyle(selection == item.tab ? .white : SensicColors.secondaryText)
+                .background {
+                    if selection == item.tab {
+                        Capsule().fill(SensicColors.accentPurple)
+                    }
+                }
+                .clipShape(Capsule())
+            }
+        }
+        .padding(4)
+        .glassEffect(in: .capsule)
+        .overlay(
+            Capsule()
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        )
+    }
+}
+
+struct EnterNameGlassAlert: View {
+    @Binding var title: String
+    let onSave: () -> Void
+    let onCancel: () -> Void
+
+    private var canSave: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var body: some View {
+        VStack(spacing: 22) {
+            Text("Enter New Name")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(.white)
+
+            TextField("", text: $title, prompt: Text("Punisher").foregroundStyle(.white.opacity(0.45)))
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .background(
+                    Capsule()
+                        .fill(Color.white.opacity(0.12))
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                )
+
+            HStack(spacing: 14) {
+                glassPillButton("Cancel", action: onCancel)
+                glassPillButton("Save", action: onSave)
+                    .opacity(canSave ? 1 : 0.45)
+                    .disabled(!canSave)
+            }
+        }
+        .padding(.horizontal, 22)
+        .padding(.vertical, 26)
+        .frame(maxWidth: 360)
+        .glassEffect(in: .rect(cornerRadius: 28))
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(Color.white.opacity(0.16), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.45), radius: 24, y: 12)
+    }
+
+    private func glassPillButton(_ label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+        }
+        .buttonStyle(.plain)
+        .background(
+            Capsule()
+                .fill(Color.white.opacity(0.12))
+        )
+        .overlay(
+            Capsule()
+                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+        )
+    }
+}
+
+struct SensicGlassTransportBar<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        content
+            .padding(.horizontal, 18)
+            .padding(.vertical, 11)
+            .glassEffect(in: .capsule)
+            .overlay(
+                Capsule()
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.22), Color.white.opacity(0.04)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1
+                    )
+            )
     }
 }
 
@@ -240,37 +515,96 @@ struct TimelineView: View {
     let isRecording: Bool
     let noteHistory: [NoteEvent]
     let elapsed: TimeInterval
+
     private let visibleSeconds: Double = 17
+    private let rulerHeight: CGFloat = 28
+    private let measureLabels = [1, 5, 9, 13, 17]
 
     var body: some View {
         GeometryReader { geo in
-            let w = geo.size.width; let h = geo.size.height
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 14).fill(SensicColors.panelNavy)
-                    .overlay(RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.white.opacity(0.06), lineWidth: 0.5))
-                ForEach(1..<18) { i in
-                    Rectangle().fill(Color.white.opacity(0.05)).frame(width: 0.5)
-                        .offset(x: CGFloat(i) / CGFloat(visibleSeconds) * w)
+            let width = geo.size.width
+            let height = geo.size.height
+            let gridHeight = max(0, height - rulerHeight)
+            let playheadX = min(
+                CGFloat(elapsed / visibleSeconds) * width,
+                max(0, width - 2)
+            )
+
+            ZStack(alignment: .topLeading) {
+                SensicColors.panelNavy
+
+                timelineRuler(width: width)
+
+                ZStack(alignment: .topLeading) {
+                    gridLines(width: width, height: gridHeight)
+                    noteBlocks(width: width, height: gridHeight)
                 }
-                ForEach(noteHistory.indices, id: \.self) { i in
-                    let note = noteHistory[i]
-                    let x    = CGFloat(note.timestamp / visibleSeconds) * w
-                    let bh   = CGFloat(note.velocity) / 127 * (h * 0.5) + 4
-                    let lane = CGFloat(note.midiNote - 21) / 88 * (h * 0.6) + 10
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(SensicColors.accentPurple.opacity(0.85))
-                        .frame(width: max(4, CGFloat(max(note.duration, 0.05) / visibleSeconds) * w), height: bh)
-                        .offset(x: min(x, w - 4), y: lane - h * 0.3)
-                }
-                if isRecording {
-                    Rectangle().fill(SensicColors.accentPurple).frame(width: 1.5)
-                        .offset(x: min(CGFloat(elapsed / visibleSeconds) * w, w - 2))
-                        .animation(.linear(duration: 0.5), value: elapsed)
-                }
+                .frame(width: width, height: gridHeight)
+                .offset(y: rulerHeight)
+
+                playhead(x: playheadX, gridHeight: gridHeight)
             }
-            .clipped()
         }
+    }
+
+    private func timelineRuler(width: CGFloat) -> some View {
+        ZStack(alignment: .leading) {
+            Rectangle()
+                .fill(Color.white.opacity(0.06))
+                .frame(height: 1)
+                .offset(y: rulerHeight - 1)
+
+            ForEach(measureLabels, id: \.self) { measure in
+                let x = CGFloat(measure) / CGFloat(visibleSeconds) * width
+                Text("\(measure)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(SensicColors.secondaryText)
+                    .position(x: x, y: rulerHeight / 2)
+            }
+        }
+        .frame(height: rulerHeight)
+    }
+
+    private func gridLines(width: CGFloat, height: CGFloat) -> some View {
+        ForEach(0..<18, id: \.self) { index in
+            let x = CGFloat(index) / CGFloat(visibleSeconds) * width
+            Rectangle()
+                .fill(SensicColors.accentPurple.opacity(index % 4 == 0 ? 0.22 : 0.08))
+                .frame(width: 1)
+                .frame(height: height)
+                .offset(x: x)
+        }
+    }
+
+    private func noteBlocks(width: CGFloat, height: CGFloat) -> some View {
+        ForEach(noteHistory.indices, id: \.self) { index in
+            let note = noteHistory[index]
+            let x = CGFloat(note.timestamp / visibleSeconds) * width
+            let barHeight = CGFloat(note.velocity) / 127 * (height * 0.45) + 6
+            let lane = CGFloat(note.midiNote - 21) / 88 * (height * 0.55) + 12
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(SensicColors.accentPurple.opacity(0.9))
+                .frame(
+                    width: max(4, CGFloat(max(note.duration, 0.05) / visibleSeconds) * width),
+                    height: barHeight
+                )
+                .offset(x: min(x, width - 4), y: lane)
+        }
+    }
+
+    private func playhead(x: CGFloat, gridHeight: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            Image(systemName: "diamond.fill")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(SensicColors.accentPurple)
+                .frame(height: rulerHeight)
+
+            Rectangle()
+                .fill(SensicColors.accentPurple)
+                .frame(width: 1.5, height: gridHeight)
+        }
+        .offset(x: max(0, x - 0.75))
+        .animation(isRecording ? .linear(duration: 0.5) : nil, value: elapsed)
     }
 }
 

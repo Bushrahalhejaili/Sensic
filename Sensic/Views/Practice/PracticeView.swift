@@ -2,53 +2,64 @@
 // Sensic
 
 import SwiftUI
+import Combine
 
 struct PracticeView: View {
     @ObservedObject var vm: PracticeViewModel
     @StateObject private var recordVM = RecordViewModel()
+    @StateObject private var scrollState = PianoScrollState()
+    @StateObject private var visualizer = PracticeVisualizerModel()
+
     @State private var hapticIntensity: Float = 0.7
     @State private var hapticSharpness: Float = 0.5
     @State private var hapticStyle: HapticStyle = .smooth
 
     var body: some View {
         VStack(spacing: 12) {
-            // Stats
-            HStack(spacing: 10) {
-                StatCard(label: "Sessions", value: "\(vm.sessions.count)")
-                StatCard(label: "Notes",    value: "\(vm.totalNotes)")
-                StatCard(label: "Accuracy", value: "\(vm.avgAccuracy)%")
-            }
+            PracticeNoteVisualizerGrid(model: visualizer)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, 16)
+            .layoutPriority(1)
+
+            HapticControlsView(
+                intensity: $hapticIntensity,
+                sharpness: $hapticSharpness,
+                style: $hapticStyle
+            )
             .padding(.horizontal, 16)
 
-            // Sessions list
-            ScrollView {
-                LazyVStack(spacing: 10) {
-                    ForEach(vm.sessions) { session in
-                        SessionRow(session: session) {
-                            vm.deleteSession(id: session.id)
-                        }
-                    }
-                    if vm.sessions.isEmpty {
-                        Text("No sessions yet — tap + to start")
-                            .font(.subheadline)
-                            .foregroundStyle(SensicColors.secondaryText)
-                            .padding(.top, 40)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
-            }
-
-            Spacer(minLength: 0)
-
-            // البيانو
             PianoWithMinimap(
                 vm: recordVM,
+                scrollState: scrollState,
                 hapticIntensity: hapticIntensity,
                 hapticSharpness: hapticSharpness,
                 hapticStyle: hapticStyle
             )
+            .frame(height: CreationLayout.pianoBlockHeight)
         }
-        .padding(.top, 8)
+        .padding(.top, 4)
+        .onAppear {
+            refreshVisualizer()
+        }
+        .onReceive(Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()) { _ in
+            refreshVisualizer()
+        }
+        .onChange(of: recordVM.activeNotes) { _, _ in
+            refreshVisualizer()
+        }
+        .onChange(of: scrollState.offset) { _, _ in
+            refreshVisualizer()
+        }
+        .onChange(of: scrollState.viewportWidth) { _, _ in
+            refreshVisualizer()
+        }
+    }
+
+    private func refreshVisualizer() {
+        visualizer.update(
+            activeNotes: recordVM.activeNotes,
+            scrollState: scrollState,
+            velocities: recordVM.activeNoteVelocities
+        )
     }
 }

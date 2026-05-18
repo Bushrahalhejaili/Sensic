@@ -55,6 +55,19 @@ final class RecordingsStore {
         persist()
     }
 
+    @discardableResult
+    func savePiece(title: String, duration: TimeInterval, noteEvents: [NoteEvent]) -> Piece {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let piece = Piece(
+            title: trimmed.isEmpty ? "Untitled" : trimmed,
+            duration: max(0, duration),
+            noteEvents: noteEvents
+        )
+        pieces.insert(piece, at: 0)
+        persist()
+        return piece
+    }
+
     func showToast(_ message: String) {
         toastMessage = message
     }
@@ -88,12 +101,12 @@ final class RecordingsStore {
         }
 
         pieces = [
-            Piece(id: UUID(), title: "Buzkiller", createdAt: date(daysAgo: 0, hour: 12, minute: 7), duration: 247),
-            Piece(id: UUID(), title: "Ego Death At Ba...", createdAt: calendar.date(byAdding: .day, value: -1, to: now) ?? now, duration: 199),
-            Piece(id: UUID(), title: "Pink Light", createdAt: date(daysAgo: 3, hour: 18, minute: 20), duration: 251),
-            Piece(id: UUID(), title: "Stayaway", createdAt: date(daysAgo: 5, hour: 21, minute: 4), duration: 211),
-            Piece(id: UUID(), title: "Midnight Run", createdAt: date(daysAgo: 24, hour: 23, minute: 11), duration: 184),
-            Piece(id: UUID(), title: "Glass Garden", createdAt: date(daysAgo: 28, hour: 10, minute: 45), duration: 222),
+            Piece(title: "Buzkiller", createdAt: date(daysAgo: 0, hour: 12, minute: 7), duration: 247),
+            Piece(title: "Ego Death At Ba...", createdAt: calendar.date(byAdding: .day, value: -1, to: now) ?? now, duration: 199),
+            Piece(title: "Pink Light", createdAt: date(daysAgo: 3, hour: 18, minute: 20), duration: 251),
+            Piece(title: "Stayaway", createdAt: date(daysAgo: 5, hour: 21, minute: 4), duration: 211),
+            Piece(title: "Midnight Run", createdAt: date(daysAgo: 24, hour: 23, minute: 11), duration: 184),
+            Piece(title: "Glass Garden", createdAt: date(daysAgo: 28, hour: 10, minute: 45), duration: 222),
         ].sorted { $0.createdAt > $1.createdAt }
     }
 }

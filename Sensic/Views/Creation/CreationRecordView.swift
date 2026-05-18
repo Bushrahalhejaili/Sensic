@@ -19,6 +19,7 @@ struct CreationRecordView: View {
     @State private var hapticIntensity: Float = 0.7
     @State private var hapticSharpness: Float = 0.5
     @State private var hapticStyle: HapticStyle = .smooth
+    @StateObject private var scrollState = PianoScrollState()
  
     var body: some View {
         VStack(spacing: 12) {
@@ -67,6 +68,7 @@ struct CreationRecordView: View {
             // Piano
             PianoWithMinimap(
                 vm: recordVM,
+                scrollState: scrollState,
                 hapticIntensity: hapticIntensity,
                 hapticSharpness: hapticSharpness,
                 hapticStyle: hapticStyle

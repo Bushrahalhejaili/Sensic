@@ -11,6 +11,34 @@ struct Piece: Identifiable, Equatable, Codable {
     var createdAt: Date
     /// Length in seconds (for waveform row).
     var duration: TimeInterval
+    var noteEvents: [NoteEvent]
+
+    init(
+        id: UUID = UUID(),
+        title: String,
+        createdAt: Date = Date(),
+        duration: TimeInterval,
+        noteEvents: [NoteEvent] = []
+    ) {
+        self.id = id
+        self.title = title
+        self.createdAt = createdAt
+        self.duration = duration
+        self.noteEvents = noteEvents
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        duration = try container.decode(TimeInterval.self, forKey: .duration)
+        noteEvents = try container.decodeIfPresent([NoteEvent].self, forKey: .noteEvents) ?? []
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, title, createdAt, duration, noteEvents
+    }
 
     var formattedDuration: String {
         let total = max(0, Int(duration.rounded()))
