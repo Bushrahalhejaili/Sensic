@@ -1,3 +1,11 @@
+//
+//  RecordViewModel.swift
+//  Sensic
+//
+//  Created by شهد عبدالله القحطاني on 01/12/1447 AH.
+//
+
+
 // RecordViewModel.swift
 // Sensic
 
@@ -6,7 +14,7 @@ import AVFoundation
 import Combine
 
 @MainActor
-final class CreationViewModel: ObservableObject {
+final class RecordViewModel: ObservableObject {
 
     // ─────────────────────────────────────────
     // MARK: - State
