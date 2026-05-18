@@ -35,11 +35,3 @@ struct PracticeSession: Identifiable, Codable {
         self.createdAt       = .now
     }
 }
-
-struct PianoKeyModel: Identifiable {
-    let id      = UUID()
-    let midi:     UInt8
-    let isBlack:  Bool
-    let noteName: String
-    let octave:   Int
-}
