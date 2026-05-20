@@ -118,31 +118,31 @@ struct CreationView: View {
         } message: {
             Text("Do you want to save this recording or delete it?")
         }
+        .preferredColorScheme(.dark)
     }
 
     // MARK: - Header
 
     private var headerBar: some View {
         HStack(spacing: 12) {
-            SensicGlassCircleButton(
-                systemName: "chevron.left",
-                iconColor: Color("MainPurple"),
+            glassCircleButton(
+                icon: "chevron.left",
+                iconSize: 20,
+                iconColor: .white,
                 action: attemptGoBack
             )
 
             Spacer(minLength: 0)
 
-            SensicGlassSegmentPicker(
-                tabs: [(.record, "Record"), (.practice, "Practice")],
-                selection: $activeTab
-            )
+            segmentPicker
 
             Spacer(minLength: 0)
 
             if activeTab == .record {
-                SensicGlassCircleButton(
-                    systemName: "checkmark",
-                    iconColor: Color("MainPurple"),
+                glassCircleButton(
+                    icon: "checkmark",
+                    iconSize: 20,
+                    iconColor: .white,
                     action: presentSaveSheet
                 )
             } else {
@@ -153,12 +153,53 @@ struct CreationView: View {
         }
     }
 
+    // Custom segmented control — solid Navy capsule with a MainPurple
+    // thumb that slides between segments. Avoids UISegmentedControl's
+    // translucent vibrancy overlay (which was lightening the Navy)
+    // and its legacy-mode rendering glitches.
+    @Namespace private var segNamespace
+
+    private var segmentPicker: some View {
+        HStack(spacing: 0) {
+            segmentLabel("Record",   tab: .record)
+            segmentLabel("Practice", tab: .practice)
+        }
+        .padding(3)
+        .background(Color("Navy"))
+        .clipShape(Capsule())
+        .frame(width: 214, height: 44)
+    }
+
+    private func segmentLabel(_ title: String, tab: Tab) -> some View {
+        let selected = activeTab == tab
+        return Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                activeTab = tab
+            }
+        } label: {
+            Text(title)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background {
+                    if selected {
+                        Capsule()
+                            .fill(Color("MainPurple"))
+                            .matchedGeometryEffect(
+                                id: "segThumb", in: segNamespace)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+    }
+
     // MARK: - Workspace (matches Figma)
 
     private var recordWorkspace: some View {
         VStack(spacing: 0) {
             toolBar
                 .padding(.horizontal, 16)
+                .padding(.top, 20)
                 .padding(.bottom, 10)
 
             if showSettings {
@@ -188,80 +229,149 @@ struct CreationView: View {
         .animation(.spring(response: 0.38, dampingFraction: 0.86), value: showSettings)
     }
 
+    // MARK: - Toolbar (redesigned for iOS 26 Liquid Glass)
+
     private var toolBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 0) {
+            // Left cluster: undo, redo, controls (10 between each)
             HStack(spacing: 10) {
-                SensicGlassCircleButton(
-                    systemName: "arrow.uturn.backward",
-                    iconColor: Color("MainPurple"),
+                glassCircleButton(
+                    icon: "arrow.uturn.backward",
+                    iconSize: 20,
+                    enabled: recordVM.canUndo,
                     action: { recordVM.undo() }
                 )
-                .opacity(recordVM.canUndo ? 1 : 0.35)
-                .disabled(!recordVM.canUndo)
 
-                SensicGlassCircleButton(
-                    systemName: "arrow.uturn.forward",
-                    iconColor: Color("MainPurple"),
+                glassCircleButton(
+                    icon: "arrow.uturn.forward",
+                    iconSize: 20,
+                    enabled: recordVM.canRedo,
                     action: { recordVM.redo() }
                 )
-                .opacity(recordVM.canRedo ? 1 : 0.35)
-                .disabled(!recordVM.canRedo)
-            }
 
-            Spacer(minLength: 0)
-
-            HStack(spacing: 10) {
-                SensicGlassCircleButton(
-                    systemName: "slider.horizontal.3",
-                    isActive: showSettings,
+                glassCircleButton(
+                    icon: "slider.horizontal.3",
+                    iconSize: 20,
                     action: {
-                        withAnimation(.spring(response: 0.38, dampingFraction: 0.86)) {
+                        withAnimation(.spring(response: 0.38,
+                                              dampingFraction: 0.86)) {
                             showSettings.toggle()
                         }
                     }
                 )
-
-                transportBar
             }
+
+            // 47 between controls and playback bar (min — fills extra
+            // space on wider screens so the bar hugs the right edge).
+            Spacer(minLength: 47)
+
+            transportBar
         }
     }
+
+    // Shared angular gradient — simulates the light reflection on the
+    // glass rim. Used by all toolbar buttons (circle + capsule).
+    private var glassShineGradient: AngularGradient {
+        AngularGradient(
+            gradient: Gradient(colors: [
+                Color.black.opacity(0.4),
+                Color.white.opacity(0.6),
+                Color.black.opacity(0.2),
+                Color.white.opacity(0.9),
+                Color.black.opacity(0.2),
+                Color.black.opacity(0.4)
+            ]),
+            center: .center
+        )
+    }
+
+    // 44×44 Liquid Glass circle button.
+    // Layers: Navy fill (95%) → angular-gradient stroke rim → clear
+    // interactive glass on top.
+    private func glassCircleButton(
+        icon: String,
+        iconSize: CGFloat,
+        iconColor: Color = Color("MainPurple"),
+        enabled: Bool = true,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: iconSize, weight: .semibold))
+                .foregroundStyle(iconColor)
+                .frame(width: 44, height: 44)
+                .background(
+                    Circle()
+                        .fill(Color("Navy").opacity(0.95))
+                        .overlay(
+                            Circle().strokeBorder(
+                                glassShineGradient,
+                                lineWidth: 0.4
+                            )
+                        )
+                        .glassEffect(.clear)
+                )
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .opacity(enabled ? 1 : 0.35)
+        .disabled(!enabled)
+    }
+
+    // MARK: - Transport bar (171×44 Liquid Glass capsule)
 
     private var transportBar: some View {
-        SensicGlassTransportBar {
-            HStack(spacing: 18) {
-                transportIcon("backward.end.fill") {}
-                transportIcon("forward.end.fill") {}
+        HStack(spacing: 4) {
+            transportIcon("backward.fill") {}            // rewind back
+            transportIcon("forward.fill")  {}            // rewind fwd
 
-                transportIcon("stop.fill") {
-                    recordVM.stopPlayback()
-                    if recordVM.isRecording {
-                        _ = recordVM.stopRecording()
-                    }
+            transportIcon("stop.fill") {
+                recordVM.stopPlayback()
+                if recordVM.isRecording {
+                    _ = recordVM.stopRecording()
                 }
-
-                transportIcon(recordVM.isPlaying ? "pause.fill" : "play.fill") {
-                    recordVM.togglePlayback()
-                }
-                .opacity(recordVM.canSave ? 1 : 0.35)
-                .disabled(!recordVM.canSave)
-
-                Button {
-                    toggleRecording()
-                } label: {
-                    Image(systemName: "circle.fill")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(recordVM.isRecording ? Color("RecordingRed") : .white)
-                }
-                .buttonStyle(.plain)
             }
+
+            transportIcon(recordVM.isPlaying ? "pause.fill" : "play.fill") {
+                recordVM.togglePlayback()
+            }
+            .opacity(recordVM.canSave ? 1 : 0.35)
+            .disabled(!recordVM.canSave)
+
+            recordIconButton
         }
+        .frame(width: 171, height: 44)
+        .background(
+            Capsule()
+                .fill(Color("Navy").opacity(0.95))
+                .overlay(
+                    Capsule().strokeBorder(
+                        glassShineGradient,
+                        lineWidth: 0.4
+                    )
+                )
+                .glassEffect(.clear.interactive())
+        )
     }
 
-    private func transportIcon(_ name: String, action: @escaping () -> Void) -> some View {
+    private func transportIcon(
+        _ name: String,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             Image(systemName: name)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(.white)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var recordIconButton: some View {
+        Button(action: toggleRecording) {
+            Image(systemName: "circle.fill")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(recordVM.isRecording
+                                 ? Color("RecordingRed") : .white)
         }
         .buttonStyle(.plain)
     }
@@ -342,4 +452,5 @@ struct CreationView: View {
 
 #Preview {
     CreationView(store: .previewInstance())
+//        .preferredColorScheme(.dark)
 }
