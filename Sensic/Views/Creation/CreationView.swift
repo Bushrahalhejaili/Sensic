@@ -172,13 +172,9 @@ struct CreationView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
 
-            TimelineView(
-                isRecording: recordVM.isRecording,
-                noteHistory: recordVM.eventsForPlayback,
-                elapsed: recordVM.elapsedSeconds
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .layoutPriority(1)
+            MainTimelineView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .layoutPriority(1)
 
             PianoWithMinimap(
                 vm: recordVM,

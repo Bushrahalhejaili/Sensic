@@ -402,12 +402,14 @@ struct SwipeableRecordingRow: View {
 }
 
 struct RecordingSwipeAction: View {
+
     let title: String
     let icon: String
     let background: Color
     let action: () -> Void
 
     var body: some View {
+
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
@@ -431,6 +433,12 @@ struct RecordingSwipeAction: View {
             )
         }
         .buttonStyle(.plain)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+        )
     }
 }
 
