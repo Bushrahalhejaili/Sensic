@@ -19,7 +19,7 @@ struct HomeHeaderView: View {
 
                 Text("Choose an instrument to start")
                     .font(.system(size: 17, weight: .regular))
-                    .foregroundStyle(SensicColors.secondaryText)
+                    .foregroundStyle(Color("tertiary"))
             }
 
             Spacer(minLength: 12)
@@ -27,28 +27,44 @@ struct HomeHeaderView: View {
             Button(action: onLibraryTap) {
                 Image(systemName: "square.stack")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(SensicColors.accentPurple)
+                    .foregroundStyle(Color("MainPurple"))
                     .frame(width: 44, height: 44)
-                    .background(SensicColors.libraryButtonFill)
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle()
-                            .stroke(SensicColors.cardBorder, lineWidth: 1)
-                    )
             }
             .buttonStyle(.plain)
+            .background { libraryGlassChrome }
+            .clipShape(Circle())
+            .contentShape(Circle())
         }
+    }
+
+    private var libraryGlassChrome: some View {
+        Circle()
+            .fill(Color("Navy"))
+            .overlay {
+                Circle()
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.35),
+                                Color.white.opacity(0.1),
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1
+                    )
+            }
+            .glassEffect(in: .circle)
     }
 }
 
 // MARK: - Piano card
-// بطاقة الآلة (Piano) — التصميم من Figma: أيقونة يسار + نص وزر يمين
 
 struct PianoInstrumentCard: View {
     var openCreation: () -> Void = {}
 
     /// نصف قطر زوايا البطاقة الخارجية
-    private let cardCorner: CGFloat = 24
+    private let cardCorner: CGFloat = 10
 
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
@@ -56,14 +72,14 @@ struct PianoInstrumentCard: View {
 
             VStack(alignment: .center, spacing: 0) {
                 Text("Piano")
-                    .font(.system(size: 26, weight: .bold))
+                    .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity, alignment: .center)
 
                 Text("Clear tactical pulses")
-                    .font(.system(size: 14, weight: .regular))
-                    .foregroundStyle(Color(red: 168 / 255, green: 172 / 255, blue: 190 / 255))
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(Color("tertiary"))
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.top, 4)
@@ -77,58 +93,45 @@ struct PianoInstrumentCard: View {
         .padding(.vertical, 16)
         .background(cardBackground)
         .overlay(cardBorder)
-        .contentShape(RoundedRectangle(cornerRadius: cardCorner, style: .continuous))
-        .onTapGesture(perform: openCreation)
     }
 
 //MARK: -Piaon Image section
-    
+
     private var pianoIconCluster: some View {
         ZStack {
-            // Blur Blue image
             Image("PianoGlowBlue")
                 .resizable()
                 .interpolation(.high)
                 .scaledToFit()
-                .frame(width: 118, height: 118)
+                .frame(width: 141, height: 137)
                 .blendMode(.plusLighter)
                 .allowsHitTesting(false)
 
-            // Blur Purple image
             Image("PianoGlowPurple")
                 .resizable()
                 .interpolation(.high)
                 .scaledToFit()
-                .frame(width: 90, height: 90)
+                .frame(width: 105, height: 93)
                 .blendMode(.plusLighter)
                 .allowsHitTesting(false)
 
-            // Piano Image
             Image("PianoInstrumentIcon")
                 .resizable()
                 .interpolation(.high)
                 .scaledToFit()
-                .padding(.top,10)
-                .frame(width: 70, height: 70)
+                .padding(.top, 10)
+                .frame(width: 95, height: 80)
         }
         .compositingGroup()
         .frame(width: 92, height: 92)
+        .padding(.horizontal, 20)
     }
 
 //Background header card
     private var cardBackground: some View {
         RoundedRectangle(cornerRadius: cardCorner, style: .continuous)
-            .fill(
-                LinearGradient(
-                    colors: [
-                        Color(red: 14 / 255, green: 17 / 255, blue: 32 / 255),
-                        Color(red: 22 / 255, green: 18 / 255, blue: 40 / 255),
-                        Color(red: 28 / 255, green: 20 / 255, blue: 46 / 255),
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
+            .fill( Color("Navy") )
+            .frame(width: 370, height: 172)
     }
 
 //Border header card
@@ -137,8 +140,8 @@ struct PianoInstrumentCard: View {
             .strokeBorder(
                 LinearGradient(
                     colors: [
-                        Color(red: 110 / 255, green: 80 / 255, blue: 160 / 255).opacity(0.45),
-                        Color(red: 60 / 255, green: 45 / 255, blue: 100 / 255).opacity(0.2),
+                        Color("MainPurple"),
+                        Color("Lavender"),
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
@@ -148,18 +151,48 @@ struct PianoInstrumentCard: View {
     }
 }
 
-// Button
+// Button — Figma: 165×36, glass + MainPurple
 private struct GetStartedButton: View {
     let action: () -> Void
 
+    private let width: CGFloat = 165
+    private let height: CGFloat = 36
+
     var body: some View {
-        Button("Get started", action: action)
-            .font(.system(size: 15, weight: .semibold))
-            .padding(.horizontal, 38)
-             .padding(.vertical, 12)
-             .controlSize(.regular)
-             .buttonStyle(.glassProminent)
-             .tint(SensicColors.accentPurpleButton)
+        Button(action: action) {
+            Text("Get started")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: width, height: height)
+        }
+        .buttonStyle(.plain)
+        .background { buttonChrome }
+        .frame(width: width, height: height)
+        .clipShape(Capsule(style: .continuous))
+        .contentShape(Capsule(style: .continuous))
+        .padding(.top,16)
+        .padding(.bottom,6)
+
+    }
+
+    private var buttonChrome: some View {
+        Capsule(style: .continuous)
+            .fill(Color("MainPurple"))
+            .overlay {
+                Capsule(style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.5),
+                                Color.white.opacity(0.15),
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1
+                    )
+            }
+            .glassEffect(in: .capsule)
     }
 }
 
@@ -181,7 +214,7 @@ struct RecordingsSectionHeader: View {
                 Button(action: onSeeAll) {
                     Text("See all")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(SensicColors.accentPurple)
+                        .foregroundStyle(Color("MainPurple"))
                 }
                 .buttonStyle(.plain)
             }
@@ -235,15 +268,22 @@ private struct RecordingActionButton: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .background(Capsule().fill(background))
+            .background(Capsule().fill(Color("SpaceBlue")))
         }
         .buttonStyle(.plain)
     }
 }
 
-/// ارتفاع لوحة التسجيلات في الهوم — يتمدد لتحت فقط ولا يدفع الهيدر/البيانو لأعلى.
 enum RecordingsPanelMetrics {
     static let contentHeight: CGFloat = 420
+    static let cornerRadius: CGFloat = 20
+}
+
+enum RecordingSwipeActionMetrics {
+    static let width: CGFloat = 92
+    static let height: CGFloat = 44
+    static let spacing: CGFloat = 8
+    static var totalRevealWidth: CGFloat { width * 3 + spacing * 2 }
 }
 
 struct RecordingsEmptyState: View {
@@ -276,9 +316,8 @@ struct SwipeableRecordingRow: View {
     var onAdd: () -> Void = {}
     var onDelete: () -> Void = {}
 
-    private let actionWidth: CGFloat = 56
-    private let actionSpacing: CGFloat = 6
-    private var actionsRevealWidth: CGFloat { actionWidth * 3 + actionSpacing * 2 }
+    private var actionsRevealWidth: CGFloat { RecordingSwipeActionMetrics.totalRevealWidth }
+    private var actionSpacing: CGFloat { RecordingSwipeActionMetrics.spacing }
 
     @State private var dragOffset: CGFloat = 0
     @State private var isDraggingHorizontally = false
@@ -296,22 +335,19 @@ struct SwipeableRecordingRow: View {
                 RecordingSwipeAction(
                     title: "Rename",
                     icon: "pencil",
-                    background: SensicColors.accentBlue,
-                    width: actionWidth,
+                    background: SensicColors.indigo,
                     action: onRename
                 )
                 RecordingSwipeAction(
                     title: "Add",
                     icon: "folder",
-                    background: SensicColors.accentPurpleButton,
-                    width: actionWidth,
+                    background: SensicColors.mainPurple,
                     action: onAdd
                 )
                 RecordingSwipeAction(
                     title: "Delete",
                     icon: "trash",
-                    background: SensicColors.accentRed,
-                    width: actionWidth,
+                    background: SensicColors.recordingRed,
                     action: onDelete
                 )
             }
@@ -322,7 +358,7 @@ struct SwipeableRecordingRow: View {
                 .gesture(swipeGesture)
         }
         .frame(maxWidth: .infinity)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous))
         .animation(.spring(response: 0.35, dampingFraction: 0.82), value: isRevealed)
         .animation(.spring(response: 0.35, dampingFraction: 0.82), value: dragOffset)
     }
@@ -369,25 +405,29 @@ struct RecordingSwipeAction: View {
     let title: String
     let icon: String
     let background: Color
-    let width: CGFloat
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 5) {
+            HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 16)
                 Text(title)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.85)
             }
             .foregroundStyle(.white)
-            .frame(width: width)
-            .frame(maxHeight: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(background)
+            .frame(
+                width: RecordingSwipeActionMetrics.width,
+                height: RecordingSwipeActionMetrics.height,
+                alignment: .center
+            )
+            .background(background, in: Capsule(style: .continuous))
+            .overlay(
+                Capsule(style: .continuous)
+                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -425,11 +465,11 @@ struct RecordingRowView: View {
         }
         .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(red: 15 / 255, green: 15 / 255, blue: 28 / 255))
+            RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous)
+                .fill(SensicColors.recordingCardBackground)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous)
                 .stroke(isSelected ? SensicColors.accentPurple.opacity(0.5) : .clear, lineWidth: 1)
         )
     }

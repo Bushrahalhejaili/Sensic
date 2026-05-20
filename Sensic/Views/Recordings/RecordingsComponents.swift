@@ -74,8 +74,8 @@ struct RecordingsSectionView: View {
             }
             .padding(8)
             .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(SensicColors.panelNavy)
+                RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous)
+                    .fill(SensicColors.recordingsPanelBackground)
             )
         }
     }
@@ -90,9 +90,8 @@ struct RecordingsSwipeRow: View {
     var onAdd: () -> Void = {}
     var onDelete: () -> Void = {}
 
-    private let actionWidth: CGFloat = 56
-    private let actionSpacing: CGFloat = 6
-    private var actionsRevealWidth: CGFloat { actionWidth * 3 + actionSpacing * 2 }
+    private var actionsRevealWidth: CGFloat { RecordingSwipeActionMetrics.totalRevealWidth }
+    private var actionSpacing: CGFloat { RecordingSwipeActionMetrics.spacing }
 
     @State private var dragOffset: CGFloat = 0
     @State private var isDraggingHorizontally = false
@@ -110,22 +109,19 @@ struct RecordingsSwipeRow: View {
                 RecordingSwipeAction(
                     title: "Rename",
                     icon: "pencil",
-                    background: SensicColors.accentBlue,
-                    width: actionWidth,
+                    background: SensicColors.indigo,
                     action: onRename
                 )
                 RecordingSwipeAction(
                     title: "Add",
                     icon: "folder",
-                    background: SensicColors.accentPurpleButton,
-                    width: actionWidth,
+                    background: SensicColors.mainPurple,
                     action: onAdd
                 )
                 RecordingSwipeAction(
                     title: "Delete",
                     icon: "trash",
-                    background: SensicColors.accentRed,
-                    width: actionWidth,
+                    background: SensicColors.recordingRed,
                     action: onDelete
                 )
             }
@@ -136,7 +132,7 @@ struct RecordingsSwipeRow: View {
                 .gesture(swipeGesture)
         }
         .frame(maxWidth: .infinity)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous))
         .padding(.horizontal, 4)
         .padding(.vertical, 4)
         .animation(.spring(response: 0.35, dampingFraction: 0.82), value: isRevealed)
@@ -212,11 +208,11 @@ struct RecordingsCardView: View {
         }
         .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(red: 15 / 255, green: 15 / 255, blue: 28 / 255))
+            RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous)
+                .fill(SensicColors.recordingCardBackground)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous)
                 .stroke(isSelected ? SensicColors.accentPurple.opacity(0.5) : .clear, lineWidth: 1)
         )
     }

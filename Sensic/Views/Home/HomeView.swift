@@ -143,10 +143,10 @@ struct HomeView: View {
         .frame(maxWidth: .infinity)
         .frame(height: RecordingsPanelMetrics.contentHeight)
         .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(SensicColors.panelNavy)
+            RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous)
+                .fill(SensicColors.recordingsPanelBackground)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous))
     }
 }
 
