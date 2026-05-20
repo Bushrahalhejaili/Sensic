@@ -357,9 +357,9 @@ enum CreationLayout {
 
 struct SensicGlassCircleButton: View {
     let systemName: String
+    /// When true, icon turns white; circle stays Navy + glass (no fill swap).
     var isActive: Bool = false
-    var activeTint: Color = Color("MainPurple")
-    var iconColor: Color = .white
+    var iconColor: Color = Color("MainPurple")
     let action: () -> Void
 
     var body: some View {
@@ -369,17 +369,10 @@ struct SensicGlassCircleButton: View {
                 .foregroundStyle(isActive ? .white : iconColor)
                 .frame(width: 44, height: 44)
                 .background {
-                    if isActive {
-                        Circle().fill(activeTint)
-                    } else {
-                        Circle().fill(.clear)
-                    }
+                    Circle()
+                        .fill(Color("Navy"))
                 }
                 .glassEffect(in: .circle)
-                .overlay(
-                    Circle()
-                        .stroke(Color.white.opacity(isActive ? 0 : 0.12), lineWidth: 1)
-                )
         }
         .buttonStyle(.plain)
     }
@@ -410,11 +403,9 @@ struct SensicGlassSegmentPicker<Tab: Hashable>: View {
             }
         }
         .padding(4)
-        .glassEffect(in: .capsule)
-        .overlay(
-            Capsule()
-                .stroke(Color.white.opacity(0.12), lineWidth: 1)
-        )
+        .glassEffect(.clear.tint(.white.opacity(20)), in: .circle)
+
+
     }
 }
 

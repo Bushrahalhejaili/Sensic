@@ -29,14 +29,23 @@ struct HomeView: View {
                 Color.black
                     .ignoresSafeArea()
 
-                VStack(alignment: .leading, spacing: 28) {
-                    HomeHeaderView()
-                        .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: HomeLayout.sectionSpacing) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack {
+                            Spacer(minLength: 0)
+                            HomeAlbumLibraryButton {
+                                viewModel.showAlbumsComingSoon()
+                            }
+                        }
+
+                        HomeHeaderView()
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
 
                     PianoInstrumentCard(openCreation: openCreation)
                         .fixedSize(horizontal: false, vertical: true)
-                        //.frame(height: 300)
-                    VStack(alignment: .leading, spacing: 14) {
+
+                    VStack(alignment: .leading, spacing: HomeLayout.subsectionSpacing) {
                         RecordingsSectionHeader(
                             showsSeeAll: viewModel.hasRecordings,
                             onSeeAll: openRecordings
@@ -46,7 +55,7 @@ struct HomeView: View {
                     }
                     .layoutPriority(-1)
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, HomeLayout.horizontalPadding)
                 .padding(.top, 8)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
@@ -122,7 +131,7 @@ struct HomeView: View {
         VStack(spacing: 0) {
             if viewModel.hasRecordings {
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 10) {
+                    VStack(spacing: RecordingsPanelMetrics.rowSpacing) {
                         ForEach(viewModel.recentRecordings) { piece in
                             SwipeableRecordingRow(
                                 piece: piece,
@@ -133,15 +142,20 @@ struct HomeView: View {
                             )
                         }
                     }
-                    .padding(16)
+                    .padding(RecordingsPanelMetrics.panelInset)
                 }
             } else {
                 RecordingsEmptyState()
-                    .padding(16)
+                    .padding(RecordingsPanelMetrics.panelInset)
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: RecordingsPanelMetrics.contentHeight)
+        .frame(
+            height: RecordingsPanelMetrics.panelHeight(
+                rowCount: viewModel.recentRecordings.count,
+                isEmpty: !viewModel.hasRecordings
+            )
+        )
         .background(
             RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous)
                 .fill(Color("SpaceBlue").opacity(0.5))

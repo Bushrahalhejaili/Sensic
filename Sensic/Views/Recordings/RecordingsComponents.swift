@@ -13,7 +13,6 @@ struct RecordingsHeaderView: View {
     var collapsed: Bool = false
     var onBack: () -> Void = {}
 
-    private let backButtonSize: CGFloat = 44
     /// Collapsed: centered title + count (iOS large-title collapse style).
     private let collapsedHeaderHeight: CGFloat = 56
 
@@ -62,23 +61,20 @@ struct RecordingsHeaderView: View {
     }
 
     private var backButton: some View {
-        Button(action: onBack) {
-            Image(systemName: "chevron.left")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: backButtonSize, height: backButtonSize)
-                .background(Color("Navy"))
-                .clipShape(Circle())
-                .overlay(
-                    Circle()
-                        .stroke(Color("MainPurple").opacity(0.35), lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
+        SensicGlassCircleButton(
+            systemName: "chevron.left",
+            iconColor: .white,
+            action: onBack
+        )
     }
 }
 
 // MARK: - Section
+
+private enum RecordingsSectionLayout {
+    static let cardInset: CGFloat = 12
+    static let rowSpacing: CGFloat = 12
+}
 
 struct RecordingsSectionView: View {
     let section: RecordingSection
@@ -93,7 +89,7 @@ struct RecordingsSectionView: View {
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(.white)
 
-            VStack(spacing: 4) {
+            VStack(spacing: RecordingsSectionLayout.rowSpacing) {
                 ForEach(section.pieces) { piece in
                     RecordingsSwipeRow(
                         piece: piece,
@@ -104,7 +100,7 @@ struct RecordingsSectionView: View {
                     )
                 }
             }
-            .padding(8)
+            .padding(RecordingsSectionLayout.cardInset)
             .background(
                 RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous)
                     .fill(Color("SpaceBlue").opacity(0.5))
