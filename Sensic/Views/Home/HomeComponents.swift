@@ -5,56 +5,38 @@
 
 import SwiftUI
 
+// MARK: - Layout (shared horizontal margins & card rhythm)
+
+enum HomeLayout {
+    static let horizontalPadding: CGFloat = 20
+    static let sectionSpacing: CGFloat = 28
+    static let subsectionSpacing: CGFloat = 14
+    static let cardCornerRadius: CGFloat = 16
+    static let cardInnerCornerRadius: CGFloat = 12
+}
+
 // MARK: - Header
 
 struct HomeHeaderView: View {
-    var onLibraryTap: () -> Void = {}
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Welcome")
+                .font(.system(size: 34, weight: .bold))
+                .foregroundStyle(.white)
+
+            Text("Choose an instrument to start")
+                .font(.system(size: 17, weight: .regular))
+                .foregroundStyle(Color("tertiary"))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct HomeAlbumLibraryButton: View {
+    var onTap: () -> Void = {}
 
     var body: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Welcome")
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(.white)
-
-                Text("Choose an instrument to start")
-                    .font(.system(size: 17, weight: .regular))
-                    .foregroundStyle(Color("tertiary"))
-            }
-
-            Spacer(minLength: 12)
-
-            Button(action: onLibraryTap) {
-                Image(systemName: "square.stack")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color("MainPurple"))
-                    .frame(width: 44, height: 44)
-            }
-            .buttonStyle(.plain)
-            .background { libraryGlassChrome }
-            .clipShape(Circle())
-            .contentShape(Circle())
-        }
-    }
-
-    private var libraryGlassChrome: some View {
-        Circle()
-            .fill(Color("Navy"))
-            .overlay {
-                Circle()
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.35),
-                                Color.white.opacity(0.1),
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        ),
-                        lineWidth: 1
-                    )
-            }
-            .glassEffect(in: .circle)
+        SensicGlassCircleButton(systemName: "square.stack", action: onTap)
     }
 }
 
@@ -62,9 +44,6 @@ struct HomeHeaderView: View {
 
 struct PianoInstrumentCard: View {
     var openCreation: () -> Void = {}
-
-    /// نصف قطر زوايا البطاقة الخارجية
-    private let cardCorner: CGFloat = 10
 
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
@@ -91,8 +70,11 @@ struct PianoInstrumentCard: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 16)
+        .frame(maxWidth: .infinity)
+        .frame(height: 172)
         .background(cardBackground)
         .overlay(cardBorder)
+        .clipShape(RoundedRectangle(cornerRadius: HomeLayout.cardCornerRadius, style: .continuous))
     }
 
 //MARK: -Piaon Image section
@@ -127,16 +109,13 @@ struct PianoInstrumentCard: View {
         .padding(.horizontal, 20)
     }
 
-//Background header card
     private var cardBackground: some View {
-        RoundedRectangle(cornerRadius: cardCorner, style: .continuous)
-            .fill( Color("Navy") )
-            .frame(width: 370, height: 172)
+        RoundedRectangle(cornerRadius: HomeLayout.cardCornerRadius, style: .continuous)
+            .fill(Color("Navy"))
     }
 
-//Border header card
     private var cardBorder: some View {
-        RoundedRectangle(cornerRadius: cardCorner, style: .continuous)
+        RoundedRectangle(cornerRadius: HomeLayout.cardCornerRadius, style: .continuous)
             .strokeBorder(
                 LinearGradient(
                     colors: [
@@ -275,8 +254,19 @@ private struct RecordingActionButton: View {
 }
 
 enum RecordingsPanelMetrics {
-    static let contentHeight: CGFloat = 420
     static let cornerRadius: CGFloat = 20
+    static let innerCornerRadius: CGFloat = 20
+    static let rowHeight: CGFloat = 72
+    static let rowSpacing: CGFloat = 10
+    static let panelInset: CGFloat = 16
+
+    static func panelHeight(rowCount: Int, isEmpty: Bool) -> CGFloat {
+        if isEmpty { return 200 }
+        let rows = max(1, rowCount)
+        return CGFloat(rows) * rowHeight
+            + CGFloat(max(0, rows - 1)) * rowSpacing
+            + panelInset * 2
+    }
 }
 
 enum RecordingSwipeActionMetrics {
@@ -284,7 +274,7 @@ enum RecordingSwipeActionMetrics {
     static let height: CGFloat = 44
     static let spacing: CGFloat = 8
     /// Gap between recording card trailing edge and first action when revealed.
-    static let cardToActionsGap: CGFloat = 3
+    static let cardToActionsGap: CGFloat = 5
     static var totalRevealWidth: CGFloat { cardToActionsGap + width * 3 + spacing * 2 }
 }
 
@@ -362,7 +352,8 @@ struct SwipeableRecordingRow: View {
                 .gesture(swipeGesture)
         }
         .frame(maxWidth: .infinity)
-        .clipShape(RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous))
+        .frame(height: RecordingsPanelMetrics.rowHeight)
+        .clipShape(RoundedRectangle(cornerRadius: RecordingsPanelMetrics.innerCornerRadius, style: .continuous))
         .animation(.spring(response: 0.35, dampingFraction: 0.82), value: isRevealed)
         .animation(.spring(response: 0.35, dampingFraction: 0.82), value: dragOffset)
     }
@@ -469,8 +460,9 @@ struct RecordingRowView: View {
             }
         }
         .padding(14)
+        .frame(maxWidth: .infinity, minHeight: RecordingsPanelMetrics.rowHeight, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: RecordingsPanelMetrics.innerCornerRadius, style: .continuous)
                 .fill(Color("SpaceBlue"))
         )
     }
