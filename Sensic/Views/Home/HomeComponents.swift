@@ -276,8 +276,8 @@ struct SwipeableRecordingRow: View {
     var onAdd: () -> Void = {}
     var onDelete: () -> Void = {}
 
-    private let actionWidth: CGFloat = 56
-    private let actionSpacing: CGFloat = 6
+    private let actionWidth: CGFloat = 74
+    private let actionSpacing: CGFloat = 2
     private var actionsRevealWidth: CGFloat { actionWidth * 3 + actionSpacing * 2 }
 
     @State private var dragOffset: CGFloat = 0
@@ -366,6 +366,7 @@ struct SwipeableRecordingRow: View {
 }
 
 struct RecordingSwipeAction: View {
+
     let title: String
     let icon: String
     let background: Color
@@ -373,24 +374,34 @@ struct RecordingSwipeAction: View {
     let action: () -> Void
 
     var body: some View {
+
         Button(action: action) {
-            VStack(spacing: 5) {
+
+            VStack(spacing: 6) {
+
+                Spacer()
+
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 18, weight: .medium))
+
                 Text(title)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 13, weight: .medium))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+
+                Spacer()
             }
             .foregroundStyle(.white)
             .frame(width: width)
             .frame(maxHeight: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(background)
-            )
+            .background(background)
         }
         .buttonStyle(.plain)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+        )
     }
 }
 
@@ -425,11 +436,11 @@ struct RecordingRowView: View {
         }
         .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(Color(red: 15 / 255, green: 15 / 255, blue: 28 / 255))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .stroke(isSelected ? SensicColors.accentPurple.opacity(0.5) : .clear, lineWidth: 1)
         )
     }

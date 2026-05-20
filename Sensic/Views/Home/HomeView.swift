@@ -35,7 +35,7 @@ struct HomeView: View {
 
                     PianoInstrumentCard(openCreation: openCreation)
                         .fixedSize(horizontal: false, vertical: true)
-
+                        //.frame(height: 300)
                     VStack(alignment: .leading, spacing: 14) {
                         RecordingsSectionHeader(
                             showsSeeAll: viewModel.hasRecordings,
@@ -142,11 +142,13 @@ struct HomeView: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: RecordingsPanelMetrics.contentHeight)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(SensicColors.panelNavy)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        //.background(
+           // RoundedRectangle(cornerRadius: 22, style: .continuous)
+             //   .fill(SensicColors.panelNavy)
+       // )
+       // .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .frame(maxWidth: .infinity)
+        .frame(height: RecordingsPanelMetrics.contentHeight)
     }
 }
 

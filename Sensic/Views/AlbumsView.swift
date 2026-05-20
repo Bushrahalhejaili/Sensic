@@ -437,7 +437,7 @@ struct AlbumDetailsView: View {
                 HStack {
 
                     Button {
-
+                      //  .buttonStyle(.glassProminent)
                     } label: {
 
                         Circle()
