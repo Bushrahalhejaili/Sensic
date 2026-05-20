@@ -26,7 +26,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack(path: $navigationPath) {
             ZStack {
-                SensicColors.background
+                Color.black
                     .ignoresSafeArea()
 
                 VStack(alignment: .leading, spacing: 28) {
@@ -144,7 +144,7 @@ struct HomeView: View {
         .frame(height: RecordingsPanelMetrics.contentHeight)
         .background(
             RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous)
-                .fill(SensicColors.recordingsPanelBackground)
+                .fill(Color("SpaceBlue").opacity(0.5))
         )
         .clipShape(RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous))
     }

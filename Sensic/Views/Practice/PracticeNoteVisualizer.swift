@@ -53,7 +53,7 @@ struct PracticeNoteVisualizerGrid: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(SensicColors.panelNavy)
+                .fill(Color("SpaceBlue"))
 
             GeometryReader { geo in
                 let metrics = GridMetrics.fit(

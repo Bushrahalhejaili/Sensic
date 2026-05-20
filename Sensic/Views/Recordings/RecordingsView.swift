@@ -9,6 +9,11 @@ struct RecordingsView: View {
     @Bindable var store: RecordingsStore
     @Bindable var viewModel: RecordingsViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var isHeaderCollapsed = false
+
+    /// Collapse once scrolled past this offset; expand only below `headerExpandScrollThreshold` so the compact bar doesn’t flicker/bounce open.
+    private let headerCollapseScrollThreshold: CGFloat = 24
+    private let headerExpandScrollThreshold: CGFloat = 8
 
     private var filteredPieces: [Piece] {
         let query = viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -24,21 +29,26 @@ struct RecordingsView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            SensicColors.background
+            Color.black
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                RecordingsHeaderView(count: filteredPieces.count, onBack: { dismiss() })
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-                    .padding(.bottom, 16)
-                    .background(SensicColors.background)
+                RecordingsHeaderView(
+                    count: filteredPieces.count,
+                    collapsed: isHeaderCollapsed,
+                    onBack: { dismiss() }
+                )
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, isHeaderCollapsed ? 10 : 16)
+                .animation(.easeInOut(duration: 0.22), value: isHeaderCollapsed)
+                .background(Color.black)
 
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 24) {
                         if viewModel.isLoading {
                             ProgressView()
-                                .tint(SensicColors.accentPurple)
+                                .tint(Color("MainPurple"))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 40)
                         } else if sections.isEmpty {
@@ -57,6 +67,25 @@ struct RecordingsView: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.bottom, 16)
+                }
+                .onScrollGeometryChange(for: CGFloat.self) { geo in
+                    geo.contentOffset.y
+                } action: { _, offsetY in
+                    // Ignore top rubber-band; some builds report small negative values at rest.
+                    let y = max(0, offsetY)
+                    let collapsed: Bool
+                    if y > headerCollapseScrollThreshold {
+                        collapsed = true
+                    } else if y < headerExpandScrollThreshold {
+                        collapsed = false
+                    } else {
+                        collapsed = isHeaderCollapsed
+                    }
+                    if collapsed != isHeaderCollapsed {
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            isHeaderCollapsed = collapsed
+                        }
+                    }
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {

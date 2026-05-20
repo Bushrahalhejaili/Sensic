@@ -20,9 +20,12 @@ final class HomeViewModel {
     var recordings: [Piece] { store.pieces }
     var hasRecordings: Bool { !store.pieces.isEmpty }
 
-    /// Latest 5 recordings for the home panel (newest first).
+    /// Home panel only: last 4 by date (newest first). Full list lives on the Recordings screen.
+    private let homeRecordingsPreviewLimit = 4
+
     var recentRecordings: [Piece] {
-        Array(recordings.prefix(5))
+        let sorted = store.pieces.sorted { $0.createdAt > $1.createdAt }
+        return Array(sorted.prefix(homeRecordingsPreviewLimit))
     }
 
     init(store: RecordingsStore = .shared) {

@@ -9,40 +9,72 @@ import SwiftUI
 
 struct RecordingsHeaderView: View {
     let count: Int
+    /// When true, title sits in one row with the back button (after scrolling).
+    var collapsed: Bool = false
     var onBack: () -> Void = {}
 
     private let backButtonSize: CGFloat = 44
+    /// Collapsed: centered title + count (iOS large-title collapse style).
+    private let collapsedHeaderHeight: CGFloat = 56
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center, spacing: 12) {
-                Button(action: onBack) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: backButtonSize, height: backButtonSize)
-                        .background(SensicColors.libraryButtonFill)
-                        .clipShape(Circle())
-                        .overlay(
-                            Circle()
-                                .stroke(SensicColors.cardBorder, lineWidth: 1)
-                        )
+        Group {
+            if collapsed {
+                ZStack {
+                    HStack {
+                        backButton
+                        Spacer(minLength: 0)
+                    }
+                    VStack(spacing: 2) {
+                        Text("Recordings")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                        Text("\(count) Recordings")
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundStyle(Color("tertiary"))
+                            .lineLimit(1)
+                    }
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
-                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+                .frame(height: collapsedHeaderHeight)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .center, spacing: 0) {
+                        backButton
+                        Spacer(minLength: 0)
+                    }
 
-                Text("Recordings")
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(.white)
+                    Text("Recordings")
+                        .font(.system(size: 34, weight: .bold))
+                        .foregroundStyle(.white)
 
-                Spacer(minLength: 0)
+                    Text("\(count) Recordings")
+                        .font(.system(size: 17, weight: .regular))
+                        .foregroundStyle(Color("tertiary"))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-
-            Text("\(count) Recordings")
-                .font(.system(size: 17, weight: .regular))
-                .foregroundStyle(SensicColors.secondaryText)
-                .padding(.leading, backButtonSize + 12)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(.easeInOut(duration: 0.2), value: collapsed)
+    }
+
+    private var backButton: some View {
+        Button(action: onBack) {
+            Image(systemName: "chevron.left")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: backButtonSize, height: backButtonSize)
+                .background(Color("Navy"))
+                .clipShape(Circle())
+                .overlay(
+                    Circle()
+                        .stroke(Color("MainPurple").opacity(0.35), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -75,7 +107,7 @@ struct RecordingsSectionView: View {
             .padding(8)
             .background(
                 RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous)
-                    .fill(SensicColors.recordingsPanelBackground)
+                    .fill(Color("SpaceBlue").opacity(0.5))
             )
         }
     }
@@ -104,37 +136,37 @@ struct RecordingsSwipeRow: View {
     }
 
     var body: some View {
-        ZStack(alignment: .trailing) {
+        ZStack(alignment: Alignment(horizontal: .trailing, vertical: .center)) {
             HStack(spacing: actionSpacing) {
+                Color.clear.frame(width: RecordingSwipeActionMetrics.cardToActionsGap)
                 RecordingSwipeAction(
                     title: "Rename",
                     icon: "pencil",
-                    background: SensicColors.indigo,
+                    background: Color("IndigoBlue"),
                     action: onRename
                 )
                 RecordingSwipeAction(
                     title: "Add",
                     icon: "folder",
-                    background: SensicColors.mainPurple,
+                    background: Color("MainPurple"),
                     action: onAdd
                 )
                 RecordingSwipeAction(
                     title: "Delete",
                     icon: "trash",
-                    background: SensicColors.recordingRed,
+                    background: Color("RecordingRed"),
                     action: onDelete
                 )
             }
+            .frame(maxHeight: .infinity, alignment: .center)
 
-            RecordingsCardView(piece: piece, isSelected: isRevealed)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            RecordingsCardView(piece: piece)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 .offset(x: rowOffset)
                 .gesture(swipeGesture)
         }
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous))
-        .padding(.horizontal, 4)
-        .padding(.vertical, 4)
         .animation(.spring(response: 0.35, dampingFraction: 0.82), value: isRevealed)
         .animation(.spring(response: 0.35, dampingFraction: 0.82), value: dragOffset)
     }
@@ -179,7 +211,6 @@ struct RecordingsSwipeRow: View {
 
 struct RecordingsCardView: View {
     let piece: Piece
-    var isSelected: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -193,7 +224,7 @@ struct RecordingsCardView: View {
 
                 Text(piece.listDateLabel())
                     .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(SensicColors.secondaryText)
+                    .foregroundStyle(Color("tertiary"))
             }
 
             HStack(spacing: 8) {
@@ -203,17 +234,13 @@ struct RecordingsCardView: View {
 
                 Text(piece.formattedDuration)
                     .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(SensicColors.secondaryText)
+                    .foregroundStyle(Color("tertiary"))
             }
         }
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous)
-                .fill(SensicColors.recordingCardBackground)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous)
-                .stroke(isSelected ? SensicColors.accentPurple.opacity(0.5) : .clear, lineWidth: 1)
+                .fill(Color("SpaceBlue"))
         )
     }
 }
@@ -226,14 +253,14 @@ struct RecordingsSearchBar: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(SensicColors.secondaryText)
+                .foregroundStyle(Color("tertiary"))
 
             TextField("Search", text: $text)
                 .foregroundStyle(.white)
                 .autocorrectionDisabled()
 
             Image(systemName: "mic.fill")
-                .foregroundStyle(SensicColors.secondaryText)
+                .foregroundStyle(Color("tertiary"))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
@@ -245,7 +272,7 @@ struct RecordingsEmptyListState: View {
     var body: some View {
         VStack(spacing: 12) {
             WaveformBarsView(
-                barColor: SensicColors.secondaryText.opacity(0.7),
+                barColor: Color("tertiary").opacity(0.7),
                 heights: WaveformBarsView.emptyPlaceholderHeights,
                 barWidth: 4,
                 spacing: 5
@@ -254,7 +281,7 @@ struct RecordingsEmptyListState: View {
 
             Text("No recordings yet")
                 .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(SensicColors.secondaryText)
+                .foregroundStyle(Color("tertiary"))
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 48)
@@ -270,7 +297,7 @@ struct RecordingsToastView: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(Capsule().fill(SensicColors.accentPurpleButton))
+            .background(Capsule().fill(Color("Lavender")))
             .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
     }
 }

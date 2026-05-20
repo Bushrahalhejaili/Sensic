@@ -262,11 +262,11 @@ struct PianoWithMinimap: View {
             .frame(height: wKH + 10)
             .overlay(alignment: .top) {
                 Rectangle()
-                    .fill(SensicColors.accentPurple.opacity(0.2))
+                    .fill(Color("MainPurple").opacity(0.2))
                     .frame(height: 1)
             }
         }
-        .background(SensicColors.cardNavy)
+        .background(Color("Navy"))
     }
 
     private var minimapNavigator: some View {
@@ -284,7 +284,7 @@ struct PianoWithMinimap: View {
                     .fill(Color(red: 8 / 255, green: 10 / 255, blue: 22 / 255))
                     .overlay(
                         Capsule()
-                            .stroke(SensicColors.accentPurple.opacity(0.85), lineWidth: 1.5)
+                            .stroke(Color("MainPurple").opacity(0.85), lineWidth: 1.5)
                     )
 
                 HStack(spacing: 2) {
@@ -306,7 +306,7 @@ struct PianoWithMinimap: View {
                     )
                     .frame(width: viewportWidth, height: barHeight)
                     .offset(x: viewportX)
-                    .shadow(color: SensicColors.accentPurple.opacity(0.35), radius: 6, y: 0)
+                    .shadow(color: Color("MainPurple").opacity(0.35), radius: 6, y: 0)
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in
@@ -340,12 +340,12 @@ struct PianoWithMinimap: View {
 
     private func minimapKeyColor(for key: PianoKeyModel) -> Color {
         if vm.activeNotes.contains(key.midi) {
-            return SensicColors.accentPurple
+            return Color("MainPurple")
         }
         if key.noteName == "C" {
             return Color.white.opacity(0.95)
         }
-        return SensicColors.accentPurple.opacity(0.72)
+        return Color("MainPurple").opacity(0.72)
     }
 }
 
@@ -358,7 +358,7 @@ enum CreationLayout {
 struct SensicGlassCircleButton: View {
     let systemName: String
     var isActive: Bool = false
-    var activeTint: Color = SensicColors.accentPurple
+    var activeTint: Color = Color("MainPurple")
     var iconColor: Color = .white
     let action: () -> Void
 
@@ -400,10 +400,10 @@ struct SensicGlassSegmentPicker<Tab: Hashable>: View {
                 .font(.system(size: 15, weight: .semibold))
                 .padding(.vertical, 8)
                 .padding(.horizontal, 18)
-                .foregroundStyle(selection == item.tab ? .white : SensicColors.secondaryText)
+                .foregroundStyle(selection == item.tab ? .white : Color("tertiary"))
                 .background {
                     if selection == item.tab {
-                        Capsule().fill(SensicColors.accentPurple)
+                        Capsule().fill(Color("MainPurple"))
                     }
                 }
                 .clipShape(Capsule())
@@ -531,7 +531,7 @@ struct TimelineView: View {
             )
 
             ZStack(alignment: .topLeading) {
-                SensicColors.panelNavy
+                Color("SpaceBlue")
 
                 timelineRuler(width: width)
 
@@ -558,7 +558,7 @@ struct TimelineView: View {
                 let x = CGFloat(measure) / CGFloat(visibleSeconds) * width
                 Text("\(measure)")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(SensicColors.secondaryText)
+                    .foregroundStyle(Color("tertiary"))
                     .position(x: x, y: rulerHeight / 2)
             }
         }
@@ -569,7 +569,7 @@ struct TimelineView: View {
         ForEach(0..<18, id: \.self) { index in
             let x = CGFloat(index) / CGFloat(visibleSeconds) * width
             Rectangle()
-                .fill(SensicColors.accentPurple.opacity(index % 4 == 0 ? 0.22 : 0.08))
+                .fill(Color("MainPurple").opacity(index % 4 == 0 ? 0.22 : 0.08))
                 .frame(width: 1)
                 .frame(height: height)
                 .offset(x: x)
@@ -583,7 +583,7 @@ struct TimelineView: View {
             let barHeight = CGFloat(note.velocity) / 127 * (height * 0.45) + 6
             let lane = CGFloat(note.midiNote - 21) / 88 * (height * 0.55) + 12
             RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(SensicColors.accentPurple.opacity(0.9))
+                .fill(Color("MainPurple").opacity(0.9))
                 .frame(
                     width: max(4, CGFloat(max(note.duration, 0.05) / visibleSeconds) * width),
                     height: barHeight
@@ -596,11 +596,11 @@ struct TimelineView: View {
         VStack(spacing: 0) {
             Image(systemName: "diamond.fill")
                 .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(SensicColors.accentPurple)
+                .foregroundStyle(Color("MainPurple"))
                 .frame(height: rulerHeight)
 
             Rectangle()
-                .fill(SensicColors.accentPurple)
+                .fill(Color("MainPurple"))
                 .frame(width: 1.5, height: gridHeight)
         }
         .offset(x: max(0, x - 0.75))
@@ -626,32 +626,32 @@ struct HapticControlsView: View {
                 sliderRow("Haptic Sharpness", value: $sharpness)
             }
             VStack(alignment: .leading, spacing: 8) {
-                Text("Haptic style").font(.system(size: 12)).foregroundStyle(SensicColors.secondaryText)
+                Text("Haptic style").font(.system(size: 12)).foregroundStyle(Color("tertiary"))
                 styleBtn("Smooth", .smooth)
                 styleBtn("Punchy", .punchy)
             }
             .frame(width: 100)
         }
         .padding(16)
-        .background(SensicColors.panelNavy)
+        .background(Color("SpaceBlue"))
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.06), lineWidth: 0.5))
     }
 
     private func sliderRow(_ label: String, value: Binding<Float>) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label).font(.system(size: 12)).foregroundStyle(SensicColors.secondaryText)
-            Slider(value: value, in: 0...1).tint(SensicColors.accentPurple)
+            Text(label).font(.system(size: 12)).foregroundStyle(Color("tertiary"))
+            Slider(value: value, in: 0...1).tint(Color("MainPurple"))
         }
     }
 
     private func styleBtn(_ label: String, _ s: HapticStyle) -> some View {
         Button(label) { style = s }
             .font(.subheadline.weight(.medium)).frame(maxWidth: .infinity).padding(.vertical, 8)
-            .background(style == s ? SensicColors.accentPurple : Color.clear)
-            .foregroundStyle(style == s ? .white : SensicColors.secondaryText)
+            .background(style == s ? Color("MainPurple") : Color.clear)
+            .foregroundStyle(style == s ? .white : Color("tertiary"))
             .clipShape(Capsule())
-            .overlay(Capsule().stroke(style == s ? Color.clear : SensicColors.accentPurple.opacity(0.3), lineWidth: 0.5))
+            .overlay(Capsule().stroke(style == s ? Color.clear : Color("MainPurple").opacity(0.3), lineWidth: 0.5))
     }
 }
 
@@ -668,26 +668,26 @@ struct NewSessionSheet: View {
         VStack(spacing: 20) {
             Text("New Session").font(.headline).foregroundStyle(.white).padding(.top, 8)
             TextField("Session title...", text: $title)
-                .padding(14).background(SensicColors.cardNavy)
+                .padding(14).background(Color("Navy"))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12)
-                    .stroke(SensicColors.accentPurple.opacity(0.3), lineWidth: 0.5))
+                    .stroke(Color("MainPurple").opacity(0.3), lineWidth: 0.5))
                 .foregroundStyle(.white)
                 .onSubmit { if !title.isEmpty { onStart() } }
             HStack(spacing: 12) {
                 Button("Cancel", action: onCancel)
                     .frame(maxWidth: .infinity).padding(14)
-                    .background(SensicColors.cardNavy).foregroundStyle(SensicColors.secondaryText)
+                    .background(Color("Navy")).foregroundStyle(Color("tertiary"))
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                 Button("Start") { if !title.isEmpty { onStart() } }
                     .frame(maxWidth: .infinity).padding(14)
-                    .background(title.isEmpty ? SensicColors.accentPurple.opacity(0.4) : SensicColors.accentPurple)
+                    .background(title.isEmpty ? Color("MainPurple").opacity(0.4) : Color("MainPurple"))
                     .foregroundStyle(.white).fontWeight(.semibold)
                     .clipShape(RoundedRectangle(cornerRadius: 14)).disabled(title.isEmpty)
             }
             Spacer()
         }
-        .padding(24).background(SensicColors.panelNavy)
+        .padding(24).background(Color("SpaceBlue"))
         .presentationDetents([.fraction(0.32)]).presentationDragIndicator(.visible)
     }
 }

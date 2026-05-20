@@ -48,7 +48,7 @@ struct CreationRecordView: View {
                         .foregroundStyle(.white)
                     Spacer()
                     Button("Discard") { recordVM.discardRecording() }
-                        .font(.subheadline).foregroundStyle(SensicColors.secondaryText)
+                        .font(.subheadline).foregroundStyle(Color("tertiary"))
                 } else {
                     Spacer()
                     Button {
@@ -56,7 +56,7 @@ struct CreationRecordView: View {
                     } label: {
                         Label("Start recording", systemImage: "record.circle")
                             .font(.subheadline.weight(.medium))
-                            .foregroundStyle(SensicColors.accentPurple)
+                            .foregroundStyle(Color("MainPurple"))
                     }
                     Spacer()
                 }

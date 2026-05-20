@@ -16,7 +16,7 @@ struct AlbumsView: View {
         NavigationStack {
             ZStack {
                 
-                SensicColors.background
+                Color.black
                     .ignoresSafeArea()
                 
                 VStack(alignment: .leading, spacing: 0) {
@@ -64,7 +64,7 @@ extension AlbumsView {
             } label: {
 
                 Circle()
-                    .fill(SensicColors.libraryButtonFill)
+                    .fill(Color("Navy"))
                     .frame(width: 42, height: 42)
                     .overlay {
 
@@ -83,12 +83,12 @@ extension AlbumsView {
             } label: {
 
                 Circle()
-                    .fill(SensicColors.libraryButtonFill)
+                    .fill(Color("Navy"))
                     .frame(width: 42, height: 42)
                     .overlay {
 
                         Image(systemName: "plus")
-                            .foregroundStyle(SensicColors.accentPurple)
+                            .foregroundStyle(Color("MainPurple"))
                             .font(.system(size: 18, weight: .bold))
                     }
             }
@@ -105,7 +105,7 @@ extension AlbumsView {
 
             Text("\(vm.albums.count) Albums")
                 .font(.system(size: 17))
-                .foregroundStyle(SensicColors.secondaryText)
+                .foregroundStyle(Color("tertiary"))
         }
         .padding(.top, 14)
     }
@@ -123,7 +123,7 @@ extension AlbumsView {
             Text("Click the plus button\nto creat one.")
                 .multilineTextAlignment(.center)
                 .font(.system(size: 16))
-                .foregroundStyle(SensicColors.secondaryText)
+                .foregroundStyle(Color("tertiary"))
 
             Spacer()
         }
@@ -190,7 +190,7 @@ extension AlbumsView {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 24)
-                .stroke(SensicColors.cardBorder, lineWidth: 1)
+                .stroke(Color("MainPurple").opacity(0.35), lineWidth: 1)
         )
     }
 
@@ -199,10 +199,10 @@ extension AlbumsView {
         HStack(spacing: 10) {
 
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(SensicColors.secondaryText)
+                .foregroundStyle(Color("tertiary"))
 
             Text("Search")
-                .foregroundStyle(SensicColors.secondaryText)
+                .foregroundStyle(Color("tertiary"))
 
             Spacer()
 
@@ -213,11 +213,11 @@ extension AlbumsView {
         .frame(height: 50)
         .background(
             RoundedRectangle(cornerRadius: 18)
-                .fill(SensicColors.libraryButtonFill)
+                .fill(Color("Navy"))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 18)
-                .stroke(SensicColors.cardBorder, lineWidth: 1)
+                .stroke(Color("MainPurple").opacity(0.35), lineWidth: 1)
         )
         .padding(.bottom, 8)
     }
@@ -239,14 +239,14 @@ private struct CreateAlbumView: View {
                     .foregroundStyle(.white)
 
                 Text("Enter a name for this album.")
-                    .foregroundStyle(SensicColors.secondaryText)
+                    .foregroundStyle(Color("tertiary"))
 
                 TextField("", text: $vm.albumName)
                     .foregroundStyle(.white)
                     .padding()
                     .background(
                         Capsule()
-                            .fill(SensicColors.libraryButtonFill)
+                            .fill(Color("Navy"))
                     )
             }
 
@@ -258,7 +258,7 @@ private struct CreateAlbumView: View {
                     Text("Cancel")
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
-                        .background(Capsule().fill(SensicColors.libraryButtonFill))
+                        .background(Capsule().fill(Color("Navy")))
                         .foregroundStyle(.white)
                 }
 
@@ -268,7 +268,7 @@ private struct CreateAlbumView: View {
                     Text("Save")
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
-                        .background(Capsule().fill(SensicColors.accentPurpleButton.opacity(0.35)))
+                        .background(Capsule().fill(Color("Lavender").opacity(0.35)))
                         .foregroundStyle(.white)
                 }
             }
@@ -276,11 +276,11 @@ private struct CreateAlbumView: View {
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 34)
-                .fill(SensicColors.cardNavy)
+                .fill(Color("Navy"))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 34)
-                .stroke(SensicColors.cardBorder, lineWidth: 1)
+                .stroke(Color("MainPurple").opacity(0.35), lineWidth: 1)
         )
         .padding(.horizontal, 18)
     }
@@ -310,7 +310,7 @@ struct AlbumDetailsView: View {
                 HStack {
 
                     Circle()
-                        .fill(SensicColors.libraryButtonFill)
+                        .fill(Color("Navy"))
                         .frame(width: 42, height: 42)
                         .overlay {
 
@@ -323,12 +323,12 @@ struct AlbumDetailsView: View {
                     HStack(spacing: 12) {
 
                         Circle()
-                            .fill(SensicColors.libraryButtonFill)
+                            .fill(Color("Navy"))
                             .frame(width: 42, height: 42)
                             .overlay {
 
                                 Image(systemName: "plus")
-                                    .foregroundStyle(SensicColors.accentPurple)
+                                    .foregroundStyle(Color("MainPurple"))
                             }
                             .onTapGesture {
 
@@ -336,7 +336,7 @@ struct AlbumDetailsView: View {
                             }
 
                         Circle()
-                            .fill(SensicColors.libraryButtonFill)
+                            .fill(Color("Navy"))
                             .frame(width: 42, height: 42)
                             .overlay {
 

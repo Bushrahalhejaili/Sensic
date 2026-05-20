@@ -60,7 +60,7 @@ struct CreationView: View {
 
     var body: some View {
         ZStack {
-            SensicColors.background.ignoresSafeArea()
+            Color.black.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 headerBar
@@ -126,7 +126,7 @@ struct CreationView: View {
         HStack(spacing: 12) {
             SensicGlassCircleButton(
                 systemName: "chevron.left",
-                iconColor: SensicColors.accentPurple,
+                iconColor: Color("MainPurple"),
                 action: attemptGoBack
             )
 
@@ -142,7 +142,7 @@ struct CreationView: View {
             if activeTab == .record {
                 SensicGlassCircleButton(
                     systemName: "checkmark",
-                    iconColor: SensicColors.accentPurple,
+                    iconColor: Color("MainPurple"),
                     action: presentSaveSheet
                 )
             } else {
@@ -193,7 +193,7 @@ struct CreationView: View {
             HStack(spacing: 10) {
                 SensicGlassCircleButton(
                     systemName: "arrow.uturn.backward",
-                    iconColor: SensicColors.accentPurple,
+                    iconColor: Color("MainPurple"),
                     action: { recordVM.undo() }
                 )
                 .opacity(recordVM.canUndo ? 1 : 0.35)
@@ -201,7 +201,7 @@ struct CreationView: View {
 
                 SensicGlassCircleButton(
                     systemName: "arrow.uturn.forward",
-                    iconColor: SensicColors.accentPurple,
+                    iconColor: Color("MainPurple"),
                     action: { recordVM.redo() }
                 )
                 .opacity(recordVM.canRedo ? 1 : 0.35)
@@ -250,7 +250,7 @@ struct CreationView: View {
                 } label: {
                     Image(systemName: "circle.fill")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(recordVM.isRecording ? SensicColors.accentRed : .white)
+                        .foregroundStyle(recordVM.isRecording ? Color("RecordingRed") : .white)
                 }
                 .buttonStyle(.plain)
             }

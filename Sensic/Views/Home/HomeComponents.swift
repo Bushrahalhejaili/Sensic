@@ -232,19 +232,19 @@ struct RecordingActionBar: View {
             RecordingActionButton(
                 title: "Rename",
                 icon: "pencil",
-                background: SensicColors.accentBlue,
+                background: Color("IndigoBlue"),
                 action: onRename
             )
             RecordingActionButton(
                 title: "Add",
                 icon: "folder.badge.plus",
-                background: SensicColors.accentPurpleButton,
+                background: Color("Lavender"),
                 action: onAdd
             )
             RecordingActionButton(
                 title: "Delete",
                 icon: "trash",
-                background: SensicColors.accentRed,
+                background: Color("RecordingRed"),
                 action: onDelete
             )
         }
@@ -283,14 +283,16 @@ enum RecordingSwipeActionMetrics {
     static let width: CGFloat = 92
     static let height: CGFloat = 44
     static let spacing: CGFloat = 8
-    static var totalRevealWidth: CGFloat { width * 3 + spacing * 2 }
+    /// Gap between recording card trailing edge and first action when revealed.
+    static let cardToActionsGap: CGFloat = 3
+    static var totalRevealWidth: CGFloat { cardToActionsGap + width * 3 + spacing * 2 }
 }
 
 struct RecordingsEmptyState: View {
     var body: some View {
         VStack(spacing: 12) {
             WaveformBarsView(
-                barColor: SensicColors.secondaryText.opacity(0.7),
+                barColor: Color("tertiary").opacity(0.7),
                 heights: WaveformBarsView.emptyPlaceholderHeights,
                 barWidth: 4,
                 spacing: 5
@@ -299,11 +301,11 @@ struct RecordingsEmptyState: View {
 
             Text("No pieces yet")
                 .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(SensicColors.secondaryText)
+                .foregroundStyle(Color("tertiary"))
 
             Text("Start to create one")
                 .font(.system(size: 15, weight: .regular))
-                .foregroundStyle(SensicColors.secondaryText.opacity(0.85))
+                .foregroundStyle(Color("tertiary").opacity(0.85))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
@@ -330,30 +332,32 @@ struct SwipeableRecordingRow: View {
     }
 
     var body: some View {
-        ZStack(alignment: .trailing) {
+        ZStack(alignment: Alignment(horizontal: .trailing, vertical: .center)) {
             HStack(spacing: actionSpacing) {
+                Color.clear.frame(width: RecordingSwipeActionMetrics.cardToActionsGap)
                 RecordingSwipeAction(
                     title: "Rename",
                     icon: "pencil",
-                    background: SensicColors.indigo,
+                    background: Color("IndigoBlue"),
                     action: onRename
                 )
                 RecordingSwipeAction(
                     title: "Add",
                     icon: "folder",
-                    background: SensicColors.mainPurple,
+                    background: Color("MainPurple"),
                     action: onAdd
                 )
                 RecordingSwipeAction(
                     title: "Delete",
                     icon: "trash",
-                    background: SensicColors.recordingRed,
+                    background: Color("RecordingRed"),
                     action: onDelete
                 )
             }
+            .frame(maxHeight: .infinity, alignment: .center)
 
-            RecordingRowView(piece: piece, isSelected: isRevealed)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            RecordingRowView(piece: piece)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 .offset(x: rowOffset)
                 .gesture(swipeGesture)
         }
@@ -433,18 +437,11 @@ struct RecordingSwipeAction: View {
             )
         }
         .buttonStyle(.plain)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: 16,
-                style: .continuous
-            )
-        )
     }
 }
 
 struct RecordingRowView: View {
     let piece: Piece
-    var isSelected: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -458,7 +455,7 @@ struct RecordingRowView: View {
 
                 Text(piece.relativeTimestamp)
                     .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(SensicColors.secondaryText)
+                    .foregroundStyle(Color("tertiary"))
             }
 
             HStack(spacing: 8) {
@@ -468,17 +465,13 @@ struct RecordingRowView: View {
 
                 Text(piece.formattedDuration)
                     .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(SensicColors.secondaryText)
+                    .foregroundStyle(Color("tertiary"))
             }
         }
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous)
-                .fill(SensicColors.recordingCardBackground)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous)
-                .stroke(isSelected ? SensicColors.accentPurple.opacity(0.5) : .clear, lineWidth: 1)
+                .fill(Color("SpaceBlue"))
         )
     }
 }

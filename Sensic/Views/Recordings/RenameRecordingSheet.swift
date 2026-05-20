@@ -15,12 +15,12 @@ struct RenameRecordingSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                SensicColors.background.ignoresSafeArea()
+                Color.black.ignoresSafeArea()
 
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Recording name")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(SensicColors.secondaryText)
+                        .foregroundStyle(Color("tertiary"))
 
                     TextField("Name", text: $title)
                         .textFieldStyle(.plain)
@@ -29,13 +29,13 @@ struct RenameRecordingSheet: View {
                         .padding(14)
                         .background(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(SensicColors.panelNavy)
+                                .fill(Color("SpaceBlue"))
                         )
 
                     if showEmptyError {
                         Text("Name cannot be empty")
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(SensicColors.accentRed)
+                            .foregroundStyle(Color("RecordingRed"))
                     }
 
                     Spacer()
@@ -48,7 +48,7 @@ struct RenameRecordingSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                        .foregroundStyle(SensicColors.accentPurple)
+                        .foregroundStyle(Color("MainPurple"))
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
@@ -58,7 +58,7 @@ struct RenameRecordingSheet: View {
                             showEmptyError = true
                         }
                     }
-                    .foregroundStyle(SensicColors.accentPurple)
+                    .foregroundStyle(Color("MainPurple"))
                 }
             }
             .onAppear {
