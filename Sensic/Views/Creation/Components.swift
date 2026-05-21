@@ -197,7 +197,7 @@ struct PianoSection: UIViewRepresentable {
         let scroll = PianoScrollUIView()
         scroll.showsHorizontalScrollIndicator = false
         scroll.showsVerticalScrollIndicator = false
-        scroll.backgroundColor = UIColor(red: 0.05, green: 0.04, blue: 0.1, alpha: 1)
+        scroll.backgroundColor = .clear
         scroll.canCancelContentTouches = false
         scroll.delaysContentTouches = false
         scroll.delegate = context.coordinator
@@ -266,7 +266,6 @@ struct PianoWithMinimap: View {
                     .frame(height: 1)
             }
         }
-        .background(Color("Navy"))
     }
 
     private var minimapNavigator: some View {
