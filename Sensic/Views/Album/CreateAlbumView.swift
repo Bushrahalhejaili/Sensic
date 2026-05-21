@@ -28,7 +28,8 @@ import SwiftUI
                     .padding()
                     .background(
                         Capsule()
-                            .fill(Color("Navy"))
+                            .fill(Color("tertiary"))
+                        
                     )
             }
 
@@ -40,7 +41,7 @@ import SwiftUI
                     Text("Cancel")
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
-                        .background(Capsule().fill(Color("Navy")))
+                        .background(Capsule().fill(Color("tertiary").opacity(0.35)))
                         .foregroundStyle(.white)
                 }
 
@@ -50,7 +51,7 @@ import SwiftUI
                     Text("Save")
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
-                        .background(Capsule().fill(Color("Lavender").opacity(0.35)))
+                        .background(Capsule().fill(Color("tertiary").opacity(0.35)))
                         .foregroundStyle(.white)
                 }
             }
@@ -58,7 +59,7 @@ import SwiftUI
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 34)
-                .fill(Color("Navy"))
+                .fill(Color("Black"))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 34)
