@@ -39,4 +39,14 @@ final class AlbumsViewModel {
 
         showCreateAlbum = false
     }
+
+    func updateAlbumName(id: UUID, newName: String) {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        if let index = albums.firstIndex(where: { $0.id == id }) {
+            albums[index].name = trimmed
+        }
+    }
 }
+
