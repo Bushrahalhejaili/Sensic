@@ -1,6 +1,5 @@
 // CreationComponents.swift
 // Sensic
-
 import SwiftUI
 import UIKit
 
@@ -8,10 +7,15 @@ import UIKit
 // MARK: - Piano Constants
 // ─────────────────────────────────────────────
 
-let wKW: CGFloat = 56
-let wKH: CGFloat = 220
-let bKW: CGFloat = 34
-let bKH: CGFloat = 140
+let wKW: CGFloat = 56       // White key width
+let wKH: CGFloat = 253      // White key height
+let bKW: CGFloat = 36       // Black key width
+let bKH: CGFloat = 160      // Black key height
+let wKSpacing: CGFloat = 2  // Gap between adjacent white keys
+let keyCornerRadius: CGFloat = 10  // Bottom-corner radius (white + black)
+
+/// Horizontal stride from one white key to the next.
+let wKStride: CGFloat = wKW + wKSpacing  // 58
 
 // ─────────────────────────────────────────────
 // MARK: - Piano Key Model
@@ -32,12 +36,14 @@ private let _blackPat: [Bool] = [
 func buildPianoKeys() -> [PianoKeyModel] {
     let names = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
     var result: [PianoKeyModel] = []
+    // A0 (MIDI 21) through C8 (MIDI 108) — standard 88-key piano:
+    // 52 white keys + 36 black keys.
     for midi in 21...108 {
         result.append(PianoKeyModel(
             midi:     UInt8(midi),
-            isBlack:  _blackPat[(midi - 21 + 9) % 12],
-            noteName: names[(midi + 3) % 12],
-            octave:   (midi + 3) / 12 - 1
+            isBlack:  _blackPat[midi % 12],
+            noteName: names[midi % 12],
+            octave:   midi / 12 - 1
         ))
     }
     return result
@@ -47,13 +53,25 @@ let allPianoKeys   = buildPianoKeys()
 let whitePianoKeys = allPianoKeys.filter { !$0.isBlack }
 let blackPianoKeys = allPianoKeys.filter {  $0.isBlack }
 
+/// Black key x-position: centered on the boundary between the two
+/// surrounding white keys (standard piano layout).
 func blackKeyOffset(_ midi: UInt8) -> CGFloat? {
     var whiteCount: CGFloat = 0
     for key in allPianoKeys {
-        if key.midi == midi { return whiteCount * (wKW + 1.5) - bKW / 2 }
+        if key.midi == midi { return whiteCount * wKStride - bKW / 2 }
         if !key.isBlack { whiteCount += 1 }
     }
     return nil
+}
+
+/// Builds a rounded path with only the bottom-left and bottom-right
+/// corners rounded — used for both white and black keys.
+private func bottomRoundedPath(in rect: CGRect, radius: CGFloat) -> UIBezierPath {
+    UIBezierPath(
+        roundedRect: rect,
+        byRoundingCorners: [.bottomLeft, .bottomRight],
+        cornerRadii: CGSize(width: radius, height: radius)
+    )
 }
 
 // ─────────────────────────────────────────────
@@ -74,13 +92,13 @@ class PianoUIView: UIView {
     required init?(coder: NSCoder) { fatalError() }
 
     override func draw(_ rect: CGRect) {
-        // White keys
+        // White keys (drawn first, behind the black keys)
         for (i, key) in whitePianoKeys.enumerated() {
-            let x = CGFloat(i) * (wKW + 1.5)
+            let x = CGFloat(i) * wKStride
             let r = CGRect(x: x, y: 0, width: wKW, height: wKH)
-            let path = UIBezierPath(roundedRect: r, cornerRadius: 7)
+            let path = bottomRoundedPath(in: r, radius: keyCornerRadius)
             (activeNotes.contains(key.midi)
-                ? UIColor(red: 0.6, green: 0.44, blue: 0.76, alpha: 0.45)
+                ? UIColor(white: 0.78, alpha: 1)
                 : UIColor.white).setFill()
             path.fill()
             UIColor.black.withAlphaComponent(0.1).setStroke()
@@ -89,19 +107,20 @@ class PianoUIView: UIView {
                 let attr: [NSAttributedString.Key: Any] = [
                     .font: UIFont.systemFont(ofSize: 11, weight: .semibold),
                     .foregroundColor: activeNotes.contains(key.midi)
-                        ? UIColor(red: 0.6, green: 0.44, blue: 0.76, alpha: 1) : UIColor.gray
+                        ? UIColor.darkGray : UIColor.gray
                 ]
                 let str = NSAttributedString(string: "C\(key.octave)", attributes: attr)
                 let sz  = str.size()
                 str.draw(at: CGPoint(x: x + (wKW - sz.width) / 2, y: wKH - sz.height - 10))
             }
         }
-        // Black keys
+        // Black keys (drawn on top)
         for key in blackPianoKeys {
             guard let x = blackKeyOffset(key.midi) else { continue }
-            let path = UIBezierPath(roundedRect: CGRect(x: x, y: 0, width: bKW, height: bKH), cornerRadius: 6)
+            let r = CGRect(x: x, y: 0, width: bKW, height: bKH)
+            let path = bottomRoundedPath(in: r, radius: keyCornerRadius)
             (activeNotes.contains(key.midi)
-                ? UIColor(red: 0.47, green: 0.31, blue: 0.78, alpha: 1)
+                ? UIColor(white: 0.45, alpha: 1)
                 : UIColor(white: 0.1, alpha: 1)).setFill()
             path.fill()
         }
@@ -141,7 +160,7 @@ class PianoUIView: UIView {
             if CGRect(x: x, y: 0, width: bKW, height: bKH).contains(pt) { return key.midi }
         }
         for (i, key) in whitePianoKeys.enumerated() {
-            if CGRect(x: CGFloat(i) * (wKW + 1.5), y: 0, width: wKW, height: wKH).contains(pt) { return key.midi }
+            if CGRect(x: CGFloat(i) * wKStride, y: 0, width: wKW, height: wKH).contains(pt) { return key.midi }
         }
         return nil
     }
@@ -177,9 +196,6 @@ class PianoScrollUIView: UIScrollView, UIGestureRecognizerDelegate {
 struct PianoSection: UIViewRepresentable {
     @ObservedObject var vm: RecordViewModel
     @ObservedObject var scrollState: PianoScrollState
-    let hapticIntensity: Float
-    let hapticSharpness: Float
-    let hapticStyle: HapticStyle
 
     func makeUIView(context: Context) -> PianoScrollUIView {
         let totalW = PianoScrollState.totalContentWidth
@@ -187,8 +203,6 @@ struct PianoSection: UIViewRepresentable {
         piano.onNoteOn = { midi, velocity in
             DispatchQueue.main.async {
                 vm.noteOn(midi: midi, velocity: velocity)
-                let i = hapticStyle == .punchy ? min(1, hapticIntensity * 1.4) : hapticIntensity
-                HapticEngine.shared.play(intensity: i, sharpness: hapticSharpness)
             }
         }
         piano.onNoteOff = { midi in DispatchQueue.main.async { vm.noteOff(midi: midi) } }
@@ -198,7 +212,8 @@ struct PianoSection: UIViewRepresentable {
         scroll.showsHorizontalScrollIndicator = false
         scroll.showsVerticalScrollIndicator = false
         scroll.backgroundColor = .clear
-        scroll.canCancelContentTouches = false
+        // Let a horizontal drag cancel the touch on a key and start scrolling.
+        scroll.canCancelContentTouches = true
         scroll.delaysContentTouches = false
         scroll.delegate = context.coordinator
         scroll.addSubview(piano)
@@ -233,125 +248,24 @@ struct PianoSection: UIViewRepresentable {
 
 // ─────────────────────────────────────────────
 // MARK: - PianoWithMinimap
+//   (Minimap removed — name kept so CreationView /
+//    CreationRecordView don't need to change.)
 // ─────────────────────────────────────────────
 
 struct PianoWithMinimap: View {
     @ObservedObject var vm: RecordViewModel
     @ObservedObject var scrollState: PianoScrollState
-    let hapticIntensity: Float
-    let hapticSharpness: Float
-    let hapticStyle: HapticStyle
-
-    @State private var dragStartNormalized: CGFloat = 0
-    @State private var isDraggingViewport = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            minimapNavigator
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-                .padding(.bottom, 8)
-
-            PianoSection(
-                vm: vm,
-                scrollState: scrollState,
-                hapticIntensity: hapticIntensity,
-                hapticSharpness: hapticSharpness,
-                hapticStyle: hapticStyle
-            )
-            .frame(height: wKH + 10)
-            .overlay(alignment: .top) {
-                Rectangle()
-                    .fill(Color("MainPurple").opacity(0.2))
-                    .frame(height: 1)
-            }
-        }
-    }
-
-    private var minimapNavigator: some View {
-        GeometryReader { geo in
-            let inset: CGFloat = 6
-            let mapWidth = geo.size.width - inset * 2
-            let barHeight = geo.size.height - inset * 2
-            let viewportRatio = min(1, scrollState.viewportWidth / PianoScrollState.totalContentWidth)
-            let viewportWidth = max(52, mapWidth * viewportRatio)
-            let travel = max(0, mapWidth - viewportWidth)
-            let viewportX = inset + travel * scrollState.normalizedOffset
-
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color(red: 8 / 255, green: 10 / 255, blue: 22 / 255))
-                    .overlay(
-                        Capsule()
-                            .stroke(Color("MainPurple").opacity(0.85), lineWidth: 1.5)
-                    )
-
-                HStack(spacing: 2) {
-                    ForEach(whitePianoKeys) { key in
-                        Capsule()
-                            .fill(minimapKeyColor(for: key))
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-                .padding(.horizontal, inset + 8)
-                .padding(.vertical, inset + 4)
-                .frame(height: barHeight)
-
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.white.opacity(0.55), lineWidth: 1.5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.white.opacity(0.08))
-                    )
-                    .frame(width: viewportWidth, height: barHeight)
-                    .offset(x: viewportX)
-                    .shadow(color: Color("MainPurple").opacity(0.35), radius: 6, y: 0)
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                guard travel > 0 else { return }
-                                if !isDraggingViewport {
-                                    isDraggingViewport = true
-                                    dragStartNormalized = scrollState.normalizedOffset
-                                }
-                                let delta = value.translation.width / travel
-                                scrollState.setNormalizedOffset(
-                                    min(1, max(0, dragStartNormalized + delta)),
-                                    animated: false
-                                )
-                            }
-                            .onEnded { _ in
-                                isDraggingViewport = false
-                            }
-                    )
-            }
-            .contentShape(Capsule())
-            .onTapGesture { location in
-                guard travel > 0 else { return }
-                let localX = location.x - inset - viewportWidth / 2
-                let target = min(1, max(0, localX / travel))
-                scrollState.setNormalizedOffset(target, animated: true)
-            }
-        }
-        .frame(height: 44)
-        .animation(.easeOut(duration: 0.05), value: vm.activeNotes)
-    }
-
-    private func minimapKeyColor(for key: PianoKeyModel) -> Color {
-        if vm.activeNotes.contains(key.midi) {
-            return Color("MainPurple")
-        }
-        if key.noteName == "C" {
-            return Color.white.opacity(0.95)
-        }
-        return Color("MainPurple").opacity(0.72)
+        PianoSection(vm: vm, scrollState: scrollState)
+            .frame(height: wKH)
     }
 }
 
 // MARK: - Glass chrome
 
 enum CreationLayout {
-    static let pianoBlockHeight: CGFloat = wKH + 10 + 44 + 12
+    static let pianoBlockHeight: CGFloat = wKH
 }
 
 struct SensicGlassCircleButton: View {
@@ -595,53 +509,6 @@ struct TimelineView: View {
         }
         .offset(x: max(0, x - 0.75))
         .animation(isRecording ? .linear(duration: 0.5) : nil, value: elapsed)
-    }
-}
-
-// ─────────────────────────────────────────────
-// MARK: - HapticControlsView
-// ─────────────────────────────────────────────
-
-enum HapticStyle { case smooth, punchy }
-
-struct HapticControlsView: View {
-    @Binding var intensity: Float
-    @Binding var sharpness: Float
-    @Binding var style: HapticStyle
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 14) {
-                sliderRow("Haptic intensity", value: $intensity)
-                sliderRow("Haptic Sharpness", value: $sharpness)
-            }
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Haptic style").font(.system(size: 12)).foregroundStyle(Color("tertiary"))
-                styleBtn("Smooth", .smooth)
-                styleBtn("Punchy", .punchy)
-            }
-            .frame(width: 100)
-        }
-        .padding(16)
-        .background(Color("SpaceBlue"))
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.06), lineWidth: 0.5))
-    }
-
-    private func sliderRow(_ label: String, value: Binding<Float>) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(label).font(.system(size: 12)).foregroundStyle(Color("tertiary"))
-            Slider(value: value, in: 0...1).tint(Color("MainPurple"))
-        }
-    }
-
-    private func styleBtn(_ label: String, _ s: HapticStyle) -> some View {
-        Button(label) { style = s }
-            .font(.subheadline.weight(.medium)).frame(maxWidth: .infinity).padding(.vertical, 8)
-            .background(style == s ? Color("MainPurple") : Color.clear)
-            .foregroundStyle(style == s ? .white : Color("tertiary"))
-            .clipShape(Capsule())
-            .overlay(Capsule().stroke(style == s ? Color.clear : Color("MainPurple").opacity(0.3), lineWidth: 0.5))
     }
 }
 

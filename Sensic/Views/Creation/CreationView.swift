@@ -4,33 +4,6 @@
 //
 
 import SwiftUI
-import CoreHaptics
-
-// MARK: - Haptic Engine
-
-final class HapticEngine {
-    static let shared = HapticEngine()
-    private var engine: CHHapticEngine?
-    private init() { prepare() }
-
-    func prepare() {
-        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
-        engine = try? CHHapticEngine()
-        try? engine?.start()
-        engine?.resetHandler = { [weak self] in try? self?.engine?.start() }
-    }
-
-    func play(intensity: Float, sharpness: Float) {
-        guard let engine,
-              CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
-        let i = CHHapticEventParameter(parameterID: .hapticIntensity, value: intensity)
-        let s = CHHapticEventParameter(parameterID: .hapticSharpness, value: sharpness)
-        let event = CHHapticEvent(eventType: .hapticTransient, parameters: [i, s], relativeTime: 0)
-        guard let pattern = try? CHHapticPattern(events: [event], parameters: []),
-              let player = try? engine.makePlayer(with: pattern) else { return }
-        try? player.start(atTime: CHHapticTimeImmediate)
-    }
-}
 
 // MARK: - CreationView
 
@@ -51,10 +24,6 @@ struct CreationView: View {
     @State private var saveErrorMessage = ""
     @State private var saveTitle = ""
     @State private var saveNavigatesToRecordings = true
-
-    @State private var hapticIntensity: Float = 0.7
-    @State private var hapticSharpness: Float = 0.5
-    @State private var hapticStyle: HapticStyle = .smooth
 
     enum Tab: Hashable { case record, practice }
 
@@ -154,9 +123,7 @@ struct CreationView: View {
     }
 
     // Custom segmented control — solid Navy capsule with a MainPurple
-    // thumb that slides between segments. Avoids UISegmentedControl's
-    // translucent vibrancy overlay (which was lightening the Navy)
-    // and its legacy-mode rendering glitches.
+    // thumb that slides between segments.
     @Namespace private var segNamespace
 
     private var segmentPicker: some View {
@@ -193,7 +160,7 @@ struct CreationView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Workspace (matches Figma)
+    // MARK: - Workspace
 
     private var recordWorkspace: some View {
         VStack(spacing: 0) {
@@ -202,34 +169,21 @@ struct CreationView: View {
                 .padding(.top, 20)
                 .padding(.bottom, 10)
 
-            if showSettings {
-                HapticControlsView(
-                    intensity: $hapticIntensity,
-                    sharpness: $hapticSharpness,
-                    style: $hapticStyle
-                )
-                .padding(.horizontal, 16)
-                .padding(.bottom, 10)
-                .transition(.move(edge: .top).combined(with: .opacity))
-            }
-
             MainTimelineView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .layoutPriority(1)
 
             PianoWithMinimap(
                 vm: recordVM,
-                scrollState: scrollState,
-                hapticIntensity: hapticIntensity,
-                hapticSharpness: hapticSharpness,
-                hapticStyle: hapticStyle
+                scrollState: scrollState
             )
             .frame(height: CreationLayout.pianoBlockHeight)
+            .padding(.bottom, 9)
         }
-        .animation(.spring(response: 0.38, dampingFraction: 0.86), value: showSettings)
+        .ignoresSafeArea(.container, edges: .bottom)
     }
 
-    // MARK: - Toolbar (redesigned for iOS 26 Liquid Glass)
+    // MARK: - Toolbar
 
     private var toolBar: some View {
         HStack(spacing: 0) {
@@ -261,16 +215,13 @@ struct CreationView: View {
                 )
             }
 
-            // 47 between controls and playback bar (min — fills extra
-            // space on wider screens so the bar hugs the right edge).
             Spacer(minLength: 47)
 
             transportBar
         }
     }
 
-    // Shared angular gradient — simulates the light reflection on the
-    // glass rim. Used by all toolbar buttons (circle + capsule).
+    // Shared angular gradient for glass rim.
     private var glassShineGradient: AngularGradient {
         AngularGradient(
             gradient: Gradient(colors: [
@@ -285,9 +236,6 @@ struct CreationView: View {
         )
     }
 
-    // 44×44 Liquid Glass circle button.
-    // Layers: Navy fill (95%) → angular-gradient stroke rim → clear
-    // interactive glass on top.
     private func glassCircleButton(
         icon: String,
         iconSize: CGFloat,
@@ -318,12 +266,12 @@ struct CreationView: View {
         .disabled(!enabled)
     }
 
-    // MARK: - Transport bar (171×44 Liquid Glass capsule)
+    // MARK: - Transport bar
 
     private var transportBar: some View {
         HStack(spacing: 4) {
-            transportIcon("backward.fill") {}            // rewind back
-            transportIcon("forward.fill")  {}            // rewind fwd
+            transportIcon("backward.fill") {}
+            transportIcon("forward.fill")  {}
 
             transportIcon("stop.fill") {
                 recordVM.stopPlayback()

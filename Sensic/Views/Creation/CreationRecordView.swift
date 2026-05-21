@@ -13,14 +13,11 @@ import AVFoundation
 struct CreationRecordView: View {
     @ObservedObject var recordVM: RecordViewModel
     @ObservedObject var practiceVM: PracticeViewModel
- 
+
     @State private var showNewSession  = false
     @State private var newTitle        = ""
-    @State private var hapticIntensity: Float = 0.7
-    @State private var hapticSharpness: Float = 0.5
-    @State private var hapticStyle: HapticStyle = .smooth
     @StateObject private var scrollState = PianoScrollState()
- 
+
     var body: some View {
         VStack(spacing: 12) {
             // Timeline
@@ -31,15 +28,7 @@ struct CreationRecordView: View {
             )
             .frame(height: 90)
             .padding(.horizontal, 16)
- 
-            // Haptic controls
-            HapticControlsView(
-                intensity: $hapticIntensity,
-                sharpness: $hapticSharpness,
-                style: $hapticStyle
-            )
-            .padding(.horizontal, 16)
- 
+
             // Timer / controls
             HStack {
                 if recordVM.isRecording {
@@ -62,16 +51,13 @@ struct CreationRecordView: View {
                 }
             }
             .padding(.horizontal, 20)
- 
+
             Spacer(minLength: 0)
- 
+
             // Piano
             PianoWithMinimap(
                 vm: recordVM,
-                scrollState: scrollState,
-                hapticIntensity: hapticIntensity,
-                hapticSharpness: hapticSharpness,
-                hapticStyle: hapticStyle
+                scrollState: scrollState
             )
         }
         .padding(.top, 8)
@@ -84,4 +70,3 @@ struct CreationRecordView: View {
         }
     }
 }
- 
