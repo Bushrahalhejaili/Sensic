@@ -269,18 +269,29 @@ struct CreationView: View {
     // MARK: - Transport bar
 
     private var transportBar: some View {
-        HStack(spacing: 4) {
+        // True whenever something is happening — recording or playback.
+        let isActive = recordVM.isRecording || recordVM.isPlaying
+        let activeGreen = Color(red: 0.30, green: 0.85, blue: 0.40)
+        let activeGrey  = Color(white: 0.65)
+
+        return HStack(spacing: 4) {
             transportIcon("backward.fill") {}
             transportIcon("forward.fill")  {}
 
-            transportIcon("stop.fill") {
+            transportIcon(
+                "stop.fill",
+                color: isActive ? activeGrey : .white
+            ) {
                 recordVM.stopPlayback()
                 if recordVM.isRecording {
                     _ = recordVM.stopRecording()
                 }
             }
 
-            transportIcon(recordVM.isPlaying ? "pause.fill" : "play.fill") {
+            transportIcon(
+                "play.fill",
+                color: isActive ? activeGreen : .white
+            ) {
                 recordVM.togglePlayback()
             }
             .opacity(recordVM.canSave ? 1 : 0.35)
@@ -300,16 +311,18 @@ struct CreationView: View {
                 )
                 .glassEffect(.clear.interactive())
         )
+        .animation(.easeInOut(duration: 0.2), value: isActive)
     }
 
     private func transportIcon(
         _ name: String,
+        color: Color = .white,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             Image(systemName: name)
                 .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(color)
         }
         .buttonStyle(.plain)
     }
