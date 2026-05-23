@@ -247,25 +247,69 @@ struct PianoSection: UIViewRepresentable {
 }
 
 // ─────────────────────────────────────────────
-// MARK: - PianoWithMinimap
-//   (Minimap removed — name kept so CreationView /
-//    CreationRecordView don't need to change.)
+// MARK: - PianoScroller
+//
+//   Minimap-style strip that sits above the piano
+//   keyboard and shows the current scroll window.
+//   Stage 1: container rectangle only. Lines +
+//   picker will be added in later iterations.
 // ─────────────────────────────────────────────
 
-struct PianoWithMinimap: View {
+struct PianoScroller: View {
+
+    static let width: CGFloat        = 392
+    static let height: CGFloat       = 45
+    static let cornerRadius: CGFloat = 20
+    static let strokeWidth: CGFloat  = 1
+
+    var body: some View {
+        RoundedRectangle(
+            cornerRadius: Self.cornerRadius,
+            style: .continuous
+        )
+        .fill(Color("Navy"))
+        .overlay(
+            RoundedRectangle(
+                cornerRadius: Self.cornerRadius,
+                style: .continuous
+            )
+            .strokeBorder(Color("MainPurple"), lineWidth: Self.strokeWidth)
+        )
+        .frame(width: Self.width, height: Self.height)
+    }
+}
+
+// ─────────────────────────────────────────────
+// MARK: - PianoWithScroller
+//
+//   Vertical stack of the PianoScroller strip
+//   above the scrollable piano keyboard.
+// ─────────────────────────────────────────────
+
+struct PianoWithScroller: View {
     @ObservedObject var vm: RecordViewModel
     @ObservedObject var scrollState: PianoScrollState
 
+    /// Vertical gap between the scroller strip and the keys.
+    static let internalSpacing: CGFloat = 10
+
     var body: some View {
-        PianoSection(vm: vm, scrollState: scrollState)
-            .frame(height: wKH)
+        VStack(spacing: Self.internalSpacing) {
+            PianoScroller()
+            PianoSection(vm: vm, scrollState: scrollState)
+                .frame(height: wKH)
+        }
     }
 }
 
 // MARK: - Glass chrome
 
 enum CreationLayout {
-    static let pianoBlockHeight: CGFloat = wKH
+    /// Total block height = scroller + internal spacing + keys.
+    static let pianoBlockHeight: CGFloat =
+        PianoScroller.height
+        + PianoWithScroller.internalSpacing
+        + wKH
 }
 
 struct SensicGlassCircleButton: View {

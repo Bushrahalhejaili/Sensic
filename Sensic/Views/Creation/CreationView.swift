@@ -173,15 +173,12 @@ struct CreationView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .layoutPriority(1)
 
-            PianoScroller()
-                .padding(.top, 10)
-                .padding(.bottom, 10)
-
-            PianoWithMinimap(
+            PianoWithScroller(
                 vm: recordVM,
                 scrollState: scrollState
             )
             .frame(height: CreationLayout.pianoBlockHeight)
+            .padding(.top, 10)
             .padding(.bottom, 9)
         }
         .ignoresSafeArea(.container, edges: .bottom)

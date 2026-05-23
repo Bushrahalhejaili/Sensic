@@ -55,7 +55,7 @@ struct CreationRecordView: View {
             Spacer(minLength: 0)
 
             // Piano
-            PianoWithMinimap(
+            PianoWithScroller(
                 vm: recordVM,
                 scrollState: scrollState
             )

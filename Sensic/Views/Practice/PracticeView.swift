@@ -17,7 +17,7 @@ struct PracticeView: View {
                 .padding(.horizontal, 16)
                 .layoutPriority(1)
 
-            PianoWithMinimap(
+            PianoWithScroller(
                 vm: recordVM,
                 scrollState: scrollState
             )
