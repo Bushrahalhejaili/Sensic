@@ -250,32 +250,155 @@ struct PianoSection: UIViewRepresentable {
 // MARK: - PianoScroller
 //
 //   Minimap-style strip that sits above the piano
-//   keyboard and shows the current scroll window.
-//   Stage 1: container rectangle only. Lines +
-//   picker will be added in later iterations.
+//   keyboard. Contains 52 vertical capsule lines —
+//   one per white key on an 88-key piano (A0..C8),
+//   grouped in eight blocks. The 3rd line in every
+//   block is a C note and renders in white.
+//
+//   A draggable lavender-stroked picker sits on
+//   top and represents the visible viewport of the
+//   keyboard; dragging it scrolls the piano, and
+//   scrolling the piano moves it.
 // ─────────────────────────────────────────────
 
 struct PianoScroller: View {
+    @ObservedObject var scrollState: PianoScrollState
 
+    // Container
     static let width: CGFloat        = 392
     static let height: CGFloat       = 45
     static let cornerRadius: CGFloat = 20
     static let strokeWidth: CGFloat  = 1
 
+    // Lines
+    static let lineHeight: CGFloat       = 25
+    static let lineWidth: CGFloat        = 2
+    /// Center-to-center distance between adjacent lines inside a group.
+    static let intraGroupStride: CGFloat = 6
+    /// Center-to-center distance from the last line of a group to the
+    /// first line of the next group.
+    static let interGroupStride: CGFloat = 10
+    /// X-coordinate of the very first line's center, measured from the
+    /// rectangle's leading edge. Mirrored on the right side.
+    static let firstLineInset: CGFloat   = 29
+
+    // Picker (viewport indicator)
+    static let pickerWidth: CGFloat        = 46
+    static let pickerHeight: CGFloat       = 45
+    static let pickerCornerRadius: CGFloat = 14
+    static let pickerStrokeWidth: CGFloat  = 2
+
+    /// 8 groups: seven of 7 lines, the last of 3.  Total = 7×7 + 3 = 52.
+    private static let groupSizes: [Int] = [7, 7, 7, 7, 7, 7, 7, 3]
+
+    /// The 3rd line of every group (zero-indexed = 2) is a C note.
+    private static let cIndexInGroup = 2
+
+    /// Pre-computed (x-center, isC) for each of the 52 lines.
+    private static let lineLayout: [(x: CGFloat, isC: Bool)] = {
+        var out: [(CGFloat, Bool)] = []
+        var x = firstLineInset
+        for (gi, count) in groupSizes.enumerated() {
+            for li in 0..<count {
+                out.append((x, li == cIndexInGroup))
+                if li < count - 1 { x += intraGroupStride }
+            }
+            if gi < groupSizes.count - 1 { x += interGroupStride }
+        }
+        return out
+    }()
+
+    /// Travel range for the picker's center, in container coordinates.
+    private static let pickerMinX: CGFloat = pickerWidth / 2
+    private static let pickerMaxX: CGFloat = width - pickerWidth / 2
+
+    /// Captured normalized offset at the moment a drag begins, so
+    /// `gesture.translation` can be added to a stable starting point.
+    @State private var dragStartNorm: CGFloat?
+
     var body: some View {
-        RoundedRectangle(
-            cornerRadius: Self.cornerRadius,
-            style: .continuous
-        )
-        .fill(Color("Navy"))
-        .overlay(
+        ZStack {
+            // Background fill
+            RoundedRectangle(
+                cornerRadius: Self.cornerRadius,
+                style: .continuous
+            )
+            .fill(Color("Navy"))
+
+            // 52 vertical lines (50 MainPurple + 8 white Cs)
+            ForEach(0..<Self.lineLayout.count, id: \.self) { i in
+                let cfg = Self.lineLayout[i]
+                Capsule()
+                    .fill(cfg.isC ? Color.white : Color("MainPurple"))
+                    .frame(width: Self.lineWidth, height: Self.lineHeight)
+                    .position(x: cfg.x, y: Self.height / 2)
+            }
+
+            // Border on top so it remains crisp over the lines
             RoundedRectangle(
                 cornerRadius: Self.cornerRadius,
                 style: .continuous
             )
             .strokeBorder(Color("MainPurple"), lineWidth: Self.strokeWidth)
-        )
+
+            // Viewport picker, on top of everything
+            picker
+        }
         .frame(width: Self.width, height: Self.height)
+        // Clip to the container so the picker can travel flush to the
+        // edges without poking past the rounded corners.
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: Self.cornerRadius,
+                style: .continuous
+            )
+        )
+    }
+
+    // MARK: Picker
+
+    /// The viewport indicator. Its x-position is derived from the
+    /// piano's normalized scroll offset; dragging it horizontally
+    /// updates that offset which in turn scrolls the keyboard.
+    private var picker: some View {
+        let norm = max(0, min(1, scrollState.normalizedOffset))
+        let centerX = Self.pickerMinX
+            + norm * (Self.pickerMaxX - Self.pickerMinX)
+
+        return RoundedRectangle(
+            cornerRadius: Self.pickerCornerRadius,
+            style: .continuous
+        )
+        .fill(Color.gray.opacity(0.08))
+        .overlay(
+            RoundedRectangle(
+                cornerRadius: Self.pickerCornerRadius,
+                style: .continuous
+            )
+            .strokeBorder(
+                Color("Lavender"),
+                lineWidth: Self.pickerStrokeWidth
+            )
+        )
+        .frame(width: Self.pickerWidth, height: Self.pickerHeight)
+        .position(x: centerX, y: Self.height / 2)
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { gesture in
+                    if dragStartNorm == nil {
+                        dragStartNorm = scrollState.normalizedOffset
+                    }
+                    let travel = Self.pickerMaxX - Self.pickerMinX
+                    let delta  = gesture.translation.width / travel
+                    let newNorm = (dragStartNorm ?? 0) + delta
+                    scrollState.setNormalizedOffset(
+                        max(0, min(1, newNorm))
+                    )
+                }
+                .onEnded { _ in
+                    dragStartNorm = nil
+                }
+        )
     }
 }
 
@@ -295,7 +418,7 @@ struct PianoWithScroller: View {
 
     var body: some View {
         VStack(spacing: Self.internalSpacing) {
-            PianoScroller()
+            PianoScroller(scrollState: scrollState)
             PianoSection(vm: vm, scrollState: scrollState)
                 .frame(height: wKH)
         }
