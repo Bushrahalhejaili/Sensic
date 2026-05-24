@@ -2,25 +2,26 @@
 //  RecordingsPickerView.swift
 //  Sensic
 //
+//
+
 
 import SwiftUI
 
 // MARK: - Model
 
-struct RecordingItem: Identifiable {
-
-    let id = UUID()
-    let title: String
-    let duration: String
-    let date: String
-}
-
+struct RecordingItem: Identifiable, Equatable {
+        let id = UUID()
+        let title: String
+        let duration: String
+        let date: String
+    }
 // MARK: - View
 
 struct RecordingsPickerView: View {
 
     let album: Album
-
+    let onSave: ([RecordingItem]) -> Void
+    
     @Environment(\.dismiss) private var dismiss
 
     @State private var searchText = ""
@@ -33,6 +34,12 @@ struct RecordingsPickerView: View {
             title: "Buzzkiller",
             duration: "4:07",
             date: "12:07 PM"
+        ),
+
+        .init(
+            title: "Ego Death At Ba...",
+            duration: "3:19",
+            date: "Yesterday"
         ),
 
         .init(
@@ -57,6 +64,12 @@ struct RecordingsPickerView: View {
             title: "All them horses",
             duration: "5:13",
             date: "Apr 28, 2026"
+        ),
+
+        .init(
+            title: "Shooting Star",
+            duration: "3:52",
+            date: "Apr 29, 2026"
         )
     ]
 
@@ -67,15 +80,13 @@ struct RecordingsPickerView: View {
             Color.black
                 .ignoresSafeArea()
 
-            VStack(spacing: 20) {
+            VStack(spacing: 22) {
 
                 topBar
 
                 searchBar
 
                 recordingsList
-
-                Spacer()
             }
             .padding(.horizontal, 18)
             .padding(.top, 14)
@@ -99,46 +110,91 @@ extension RecordingsPickerView {
 
                 Circle()
                     .fill(
-                        Color(
-                            red: 20 / 255,
-                            green: 25 / 255,
-                            blue: 55 / 255
-                        )
+                    (Color("MainPurple"))
+
                     )
-                    .frame(width: 42, height: 42)
+                    .frame(width: 52, height: 52)
                     .overlay {
 
                         Image(systemName: "xmark")
+                            .font(
+                                .system(
+                                    size: 18,
+                                    weight: .medium
+                                )
+                            )
                             .foregroundStyle(.white)
                     }
             }
 
             Spacer()
 
-            Text("Add recordings")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(.white)
+            VStack(spacing: 2) {
+
+                if selectedRecordings.isEmpty {
+
+                    Text("Add recordings")
+                        .font(
+                            .system(
+                                size: 22,
+                                weight: .semibold
+                            )
+                        )
+                        .foregroundStyle(.white)
+
+                } else {
+
+                    Text(
+                        "\(selectedRecordings.count) recording\(selectedRecordings.count > 1 ? "s" : "") added to \"\(album.name)\""
+                    )
+                    .font(
+                        .system(
+                            size: 16,
+                            weight: .semibold
+                        )
+                    )
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                }
+            }
 
             Spacer()
 
+            // Check Button
+
             Button {
+
+                let selectedItems = recordings.filter {
+                    selectedRecordings.contains($0.id)
+                }
+
+                onSave(selectedItems)
 
                 dismiss()
 
             } label: {
 
                 Circle()
-                    .fill(Color.purple.opacity(0.85))
-                    .frame(width: 42, height: 42)
+                    .fill(
+                    (Color("MainPurple"))
+
+                    )
+                    .frame(width: 52, height: 52)
                     .overlay {
 
                         Image(systemName: "checkmark")
+                            .font(
+                                .system(
+                                    size: 18,
+                                    weight: .bold
+                                )
+                            )
                             .foregroundStyle(.white)
                     }
             }
         }
     }
-
     private var searchBar: some View {
 
         HStack(spacing: 10) {
@@ -154,11 +210,13 @@ extension RecordingsPickerView {
             Image(systemName: "mic.fill")
                 .foregroundStyle(.white.opacity(0.8))
         }
-        .padding(.horizontal, 14)
-        .frame(height: 48)
+        .padding(.horizontal, 16)
+        .frame(height: 52)
         .background(
             Capsule()
-                .fill(Color.white.opacity(0.1))
+                .fill(
+                    Color.white.opacity(0.12)
+                )
         )
     }
 
@@ -166,14 +224,24 @@ extension RecordingsPickerView {
 
         ScrollView(showsIndicators: false) {
 
-            VStack(spacing: 14) {
+            VStack(spacing: 2) {
 
                 ForEach(recordings) { recording in
 
-                    recordingCard(recording)
+                    VStack(spacing: 16) {
+
+                        recordingCard(recording)
+
+                        Rectangle()
+                            .fill(
+                                Color.white.opacity(0.08)
+                            )
+                            .frame(height: 1)
+                    }
                 }
             }
-            .padding(.top, 8)
+            .padding(.top, 4)
+            .padding(.bottom, 20)
         }
     }
 
@@ -181,38 +249,61 @@ extension RecordingsPickerView {
         _ recording: RecordingItem
     ) -> some View {
 
-        let isSelected = selectedRecordings.contains(recording.id)
+        let isSelected =
+        selectedRecordings.contains(recording.id)
 
-        return HStack(spacing: 14) {
+        return HStack(spacing: 12) {
 
             VStack(
                 alignment: .leading,
-                spacing: 10
+                spacing: 12
             ) {
 
                 HStack {
 
                     Text(recording.title)
-                        .font(.system(size: 24, weight: .medium))
+                        .font(
+                            .system(
+                                size: 22,
+                                weight: .medium
+                            )
+                        )
                         .foregroundStyle(.white)
 
                     Spacer()
 
                     Text(recording.date)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.gray)
+                        .font(.system(size: 14))
+                        .foregroundStyle(
+                            .gray.opacity(0.9)
+                        )
                 }
 
                 HStack(spacing: 10) {
 
                     Image(systemName: "waveform")
-                        .foregroundStyle(.white.opacity(0.85))
+                        .foregroundStyle(
+                            .white.opacity(0.9)
+                        )
 
                     Text(recording.duration)
-                        .font(.system(size: 14))
+                        .font(.system(size: 15))
                         .foregroundStyle(.gray)
                 }
             }
+            .padding(.horizontal, 18)
+            .padding(.vertical,14 )
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 28)
+                    .fill(
+                        Color(
+                            red: 16 / 255,
+                            green: 22 / 255,
+                            blue: 58 / 255
+                        )
+                    )
+            )
 
             Button {
 
@@ -220,41 +311,42 @@ extension RecordingsPickerView {
 
             } label: {
 
-                Circle()
-                    .stroke(
-                        isSelected
-                        ? Color.purple
-                        : Color.purple.opacity(0.4),
-                        lineWidth: 2
+                ZStack {
+
+                    Circle()
+                        .stroke(
+                            isSelected
+                            ? Color(
+                                red: 170 / 255,
+                                green: 102 / 255,
+                                blue: 255 / 255
+                            )
+                            : Color.purple.opacity(0.45),
+                            lineWidth: 2
+                        )
+                        .frame(width: 20, height: 20)
+
+                    Image(
+                        systemName:
+                            isSelected
+                        ? "checkmark"
+                        : "plus"
                     )
-                    .frame(width: 24, height: 24)
-                    .overlay {
+                    .font(
+                        .system(
+                            size: 9,
+                            weight: .bold
+                        )
+                    )
+                    .foregroundStyle(
+                        isSelected,
+                        (Color("MainPurple")),
 
-                        if isSelected {
-
-                            Image(systemName: "checkmark")
-                                .font(
-                                    .system(
-                                        size: 11,
-                                        weight: .bold
-                                    )
-                                )
-                                .foregroundStyle(.purple)
-                        }
-                    }
+                        : Color.purple.opacity(0.8)
+                    )
+                }
             }
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(
-                    Color(
-                        red: 17 / 255,
-                        green: 22 / 255,
-                        blue: 55 / 255
-                    )
-                )
-        )
     }
 }
 
@@ -276,13 +368,16 @@ extension RecordingsPickerView {
 }
 
 // MARK: - Preview
-
 #Preview {
+
     RecordingsPickerView(
         album: Album(
             id: UUID(),
-            name: "Test Album",
+            name: "The great divide",
             pieceIDs: []
-        )
+        ),
+        onSave: { _ in
+
+        }
     )
 }

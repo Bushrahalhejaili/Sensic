@@ -28,9 +28,9 @@ import SwiftUI
                     .padding()
                     .background(
                         Capsule()
-                            .fill(Color("tertiary"))
+                            .fill(Color("tertiary").opacity(0.35)))
                         
-                    )
+                    
             }
 
             HStack(spacing: 14) {
@@ -39,16 +39,19 @@ import SwiftUI
                     vm.showCreateAlbum = false
                 } label: {
                     Text("Cancel")
+                        .bold()
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
                         .background(Capsule().fill(Color("tertiary").opacity(0.35)))
                         .foregroundStyle(.white)
+                    
                 }
 
                 Button {
                     vm.createAlbum()
                 } label: {
                     Text("Save")
+                        .bold()
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
                         .background(Capsule().fill(Color("tertiary").opacity(0.35)))

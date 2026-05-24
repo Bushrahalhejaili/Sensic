@@ -146,8 +146,7 @@ extension AlbumsView {
 
                     NavigationLink {
 
-                        AlbumDetailsView(vm: vm, album: album)
-
+                        AlbumDetailsView(vm: vm, albumID: album.id)
                     } label: {
 
                         albumCard(album)

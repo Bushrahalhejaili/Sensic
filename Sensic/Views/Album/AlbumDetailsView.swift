@@ -2,28 +2,25 @@
 //  AlbumDetailsView.swift
 //  Sensic
 //
-//  Created by Maram Ibrahim  on 04/12/1447 AH.
-//
-////
-//  AlbumDetailsView.swift
-//  Sensic
-//
-
 import SwiftUI
 
 struct AlbumDetailsView: View {
 
     let vm: AlbumsViewModel
-    let album: Album
-    
+    let albumID: UUID
+
     @Environment(\.dismiss) private var dismiss
 
     @State private var showRecordingsPicker = false
-
     @State private var isEditingTitle = false
     @State private var albumName = ""
 
     @FocusState private var isTextFieldFocused: Bool
+
+    // MARK: - Current Album (safe)
+    private var currentAlbum: Album? {
+        vm.albums.first(where: { $0.id == albumID })
+    }
 
     var body: some View {
 
@@ -42,37 +39,92 @@ struct AlbumDetailsView: View {
             ) {
 
                 topBar
-
                 titleSection
 
                 Divider()
                     .overlay(Color.white.opacity(0.15))
 
-                Text("\(album.pieceIDs.count) Recordings")
+                Text("\(currentAlbum?.pieceIDs.count ?? 0) Recordings")
                     .foregroundStyle(.white.opacity(0.72))
                     .font(.system(size: 18, weight: .medium))
 
-                Spacer()
+                ScrollView(showsIndicators: false) {
+
+                    VStack(spacing: 8) {
+
+                        if let album = currentAlbum {
+
+                            ForEach(vm.recordings(for: album), id: \.id) { recording in
+
+                                RoundedRectangle(cornerRadius: 30)
+                                    .fill(
+                                        Color(
+                                            red: 16 / 255,
+                                            green: 22 / 255,
+                                            blue: 58 / 255
+                                        )
+                                    )
+                                    .frame(height: 105)
+                                    .overlay {
+
+                                        HStack {
+
+                                            VStack(
+                                                alignment: .leading,
+                                                spacing: 12
+                                            ) {
+
+                                                HStack {
+
+                                                    Text(recording.title)
+                                                        .font(.system(size: 22, weight: .medium))
+                                                        .foregroundStyle(.white)
+
+                                                    Spacer()
+
+                                                    Text(recording.date)
+                                                        .font(.system(size: 14))
+                                                        .foregroundStyle(.gray)
+                                                }
+
+                                                HStack(spacing: 10) {
+
+                                                    Image(systemName: "waveform")
+                                                        .foregroundStyle(.white)
+
+                                                    Text(recording.duration)
+                                                        .foregroundStyle(.gray)
+                                                }
+                                            }
+
+                                            Spacer()
+                                        }
+                                        .padding(.horizontal, 22)
+                                    }
+                            }
+                        }
+                    }
+                    .padding(.top, 6)
+                }
             }
             .padding(.horizontal, 24)
             .padding(.top, 12)
-            .frame(
-                maxWidth: .infinity,
-                maxHeight: .infinity,
-                alignment: .topLeading
-            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+
+        // MARK: - SHEET (FIXED)
 
         .sheet(isPresented: $showRecordingsPicker) {
 
-            RecordingsPickerView(album: album)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.hidden)
+            if let album = currentAlbum {
+
+                RecordingsPickerView(album: album) { selectedItems in
+                    vm.addRecordings(selectedItems, to: album)                }
+            }
         }
 
         .onAppear {
-
-            albumName = album.name
+            albumName = currentAlbum?.name ?? ""
         }
     }
 }
@@ -122,7 +174,7 @@ extension AlbumDetailsView {
                 Button {
 
                     if isEditingTitle {
-                        vm.updateAlbumName(id: album.id, newName: albumName)
+                        vm.updateAlbumName(id: albumID, newName: albumName)
                     }
 
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -215,7 +267,7 @@ extension AlbumDetailsView {
                     )
                 )
 
-            // Apply customizable background tint layer beneath stroke and icon
+           
             Circle()
                 .fill(backgroundColor)
 
@@ -237,13 +289,14 @@ extension AlbumDetailsView {
 
 #Preview {
 
-    AlbumDetailsView(
+    let album = Album(
+        id: UUID(),
+        name: "The great divide",
+        pieceIDs: []
+    )
+
+    return AlbumDetailsView(
         vm: AlbumsViewModel(),
-        album: Album(
-            id: UUID(),
-            name: "The great divide",
-            pieceIDs: []
-        )
+        albumID: album.id
     )
 }
-
