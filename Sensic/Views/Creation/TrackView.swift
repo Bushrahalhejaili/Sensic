@@ -10,6 +10,17 @@
 //  recording session state (notes + playhead) and renders the
 //  three-part visual described in the design spec.
 //
+//
+//  TrackView.swift
+//  Sensic
+//
+//  Workspace › Creation
+//  A recordable track that lives inside MainTimelineView. Owns the
+//  recording session state (notes + playhead) and renders the
+//  three-part visual described in the design spec.
+//
+//  Drop this in: Views/Creation/
+//
 
 import SwiftUI
 import Combine
@@ -60,6 +71,17 @@ final class TrackRecorder: ObservableObject {
     /// for the lifetime of the track.  Decoupled from the playhead
     /// — the playhead can drift past the end without changing this.
     @Published private(set) var recordedDuration: TimeInterval = 0
+
+    /// True when the user has tapped the track to reveal its
+    /// editing frame (white border + drag handles).
+    @Published var isSelected: Bool = false
+
+    /// Position of the track's left edge on the timeline, in
+    /// seconds.  0 = aligned with the start of the timeline; a
+    /// positive value moves the whole track (and its notes) to the
+    /// right.  Driven by the move-drag gesture and by the left
+    /// resize handle.
+    @Published var trackStartSec: TimeInterval = 0
 
     /// True when there's something to undo (`notes` is non-empty
     /// and we're not currently recording).
@@ -184,6 +206,30 @@ final class TrackRecorder: ObservableObject {
         refreshUndoRedo()
     }
 
+    // MARK: Track editing intents (select + move + resize)
+
+    /// Toggle the editing-frame visibility for the track.  No-op
+    /// during active recording — the track shape is owned by the
+    /// recording clock then.
+    func toggleSelection() {
+        guard !isRecording else { return }
+        isSelected.toggle()
+    }
+
+    /// Set the track's left-edge position on the timeline.
+    /// Clamped at 0 so the track can't slide into negative time.
+    /// Called by the move-drag gesture and the left resize handle.
+    func setTrackStartSec(_ sec: TimeInterval) {
+        trackStartSec = max(0, sec)
+    }
+
+    /// Set the recorded track's visible width in seconds.
+    /// Clamped to a 0.5s minimum so the track never collapses to
+    /// zero.  Called by both resize handles.
+    func setRecordedDuration(_ sec: TimeInterval) {
+        recordedDuration = max(0.5, sec)
+    }
+
     // MARK: Lifecycle internals
 
     private func beginFreshRecording() {
@@ -194,6 +240,8 @@ final class TrackRecorder: ObservableObject {
         previousActive.removeAll()
         redoStack.removeAll()
         recordedDuration = 0
+        isSelected = false
+        trackStartSec = 0
         rewindPlayhead()
         isRecording = true
         isPlayingBack = false
@@ -254,12 +302,18 @@ final class TrackRecorder: ObservableObject {
     /// noteOff whose `endSeconds` has been reached.  Each note
     /// fires at most once per playback session thanks to
     /// `playbackStartedIds`.
+    ///
+    /// Note times are interpreted relative to the track's left
+    /// edge, so a track moved to `trackStartSec = 5` won't fire
+    /// any audio until the playhead crosses second 5 on the
+    /// timeline.
     private func scheduleAudioEvents(upTo currentTime: TimeInterval) {
         guard let vm = pianoVM else { return }
+        let effectiveTime = currentTime - trackStartSec
         for note in notes {
             // noteOn
             if !playbackStartedIds.contains(note.id),
-               note.startSeconds <= currentTime {
+               note.startSeconds <= effectiveTime {
                 vm.noteOn(midi: note.midi, velocity: note.velocity)
                 playbackStartedIds.insert(note.id)
                 playbackPlayingIds.insert(note.id)
@@ -267,7 +321,7 @@ final class TrackRecorder: ObservableObject {
             // noteOff
             if playbackPlayingIds.contains(note.id),
                let endSec = note.endSeconds,
-               endSec <= currentTime {
+               endSec <= effectiveTime {
                 vm.noteOff(midi: note.midi)
                 playbackPlayingIds.remove(note.id)
             }
@@ -298,10 +352,11 @@ final class TrackRecorder: ObservableObject {
     ///   - any currently-sounding notes are released
     private func seekPlayhead(to target: TimeInterval) {
         let clamped = max(0, target)
+        let effectiveTime = clamped - trackStartSec
         releaseAllSoundingNotes()
         playbackStartedIds.removeAll()
 
-        for note in notes where note.startSeconds < clamped {
+        for note in notes where note.startSeconds < effectiveTime {
             playbackStartedIds.insert(note.id)
         }
 
@@ -402,11 +457,11 @@ struct TrackView: View {
     static let noteHeight: CGFloat       = 2
     static let noteCornerRadius: CGFloat = 2
 
-    static let iconSize: CGFloat          = 15
+    static let iconSize: CGFloat          = 10
     static let iconLeadingInset: CGFloat  = 7
     static let iconVerticalInset: CGFloat = 1
     static let labelSpacing: CGFloat      = 2
-    static let labelSize: CGFloat         = 15
+    static let labelSize: CGFloat         = 10
 
     /// MIDI range used for vertical placement of notes — 88-key
     /// piano (A0..C8).
@@ -422,58 +477,56 @@ struct TrackView: View {
     }
 
     var body: some View {
+        // ZStack with header overlaying the body's top 14pt — both
+        // children share the same y=0 origin, so they're literally
+        // on top of each other.  The outer `.clipShape` rounds the
+        // track AND clips any content (like the icon's bounding box)
+        // that would otherwise leak past the track's edges.
         ZStack(alignment: .topLeading) {
-            trackBody
-            header
-        }
-        .frame(width: width, height: Self.bodyHeight, alignment: .topLeading)
-    }
-
-    // MARK: Header
-
-    private var header: some View {
-        ZStack(alignment: .leading) {
-            UnevenRoundedRectangle(
-                topLeadingRadius: Self.cornerRadius,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: Self.cornerRadius,
-                style: .continuous
-            )
-            .fill(Color("IrisBlue"))
-
-            HStack(spacing: Self.labelSpacing) {
-                Image(systemName: "pianokeys")
-                    .font(.system(size: Self.iconSize))
-                    .foregroundStyle(.white)
-                    .padding(.vertical, Self.iconVerticalInset)
-
-                Text("Piano")
-                    .font(.system(size: Self.labelSize, weight: .regular))
-                    .foregroundStyle(.white)
-            }
-            .padding(.leading, Self.iconLeadingInset)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: Self.headerHeight)
-    }
-
-    // MARK: Body + notes
-
-    private var trackBody: some View {
-        ZStack(alignment: .topLeading) {
+            // Body fill — single rounded rectangle covering the
+            // entire 62pt track frame.
             RoundedRectangle(
                 cornerRadius: Self.cornerRadius,
                 style: .continuous
             )
             .fill(Color("TransparentIrisBlue"))
 
+            // Notes, positioned by (x, y) within the track.
             ForEach(notes) { note in
                 noteRectangle(note)
             }
+
+            // Header strip on top of the body's first 14pt.  Rounded
+            // top corners only (so it matches the body's rounded
+            // top), straight bottom (where it meets the body).
+            ZStack(alignment: .leading) {
+                UnevenRoundedRectangle(
+                    topLeadingRadius: Self.cornerRadius,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: Self.cornerRadius,
+                    style: .continuous
+                )
+                .fill(Color("IrisBlue"))
+
+                HStack(spacing: Self.labelSpacing) {
+                    Image(systemName: "pianokeys")
+                        .font(.system(size: Self.iconSize))
+                        .foregroundStyle(.white)
+                        .padding(.vertical, Self.iconVerticalInset)
+
+                    Text("Piano")
+                        .font(.system(size: Self.labelSize, weight: .regular))
+                        .foregroundStyle(.white)
+                }
+                .padding(.leading, Self.iconLeadingInset)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: Self.headerHeight)
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: Self.bodyHeight)
+        .frame(width: width,
+               height: Self.bodyHeight,
+               alignment: .topLeading)
         .clipShape(
             RoundedRectangle(
                 cornerRadius: Self.cornerRadius,
@@ -514,6 +567,11 @@ struct TrackView: View {
 /// body can avoid `@ObservedObject` on it and stay still during the
 /// 60Hz playhead ticks.  This view is the only one that re-renders
 /// per tick.
+///
+/// Also hosts the editing affordances: tap-to-select, drag-to-move,
+/// and edge drag handles for resizing.  When `recorder.isSelected`
+/// is true, a white-stroked rectangle frames the track and two
+/// vertical handle capsules sit at its left/right edges.
 struct TrackOverlay: View {
     @ObservedObject var recorder: TrackRecorder
 
@@ -521,20 +579,192 @@ struct TrackOverlay: View {
     /// pixelsPerBeat and the recorder's bpm.
     let pixelsPerSecond: CGFloat
 
+    /// Live offset from the body's drag.  Uses `@GestureState` (not
+    /// `@State`) for two reasons that matter on iOS 26: the
+    /// `.updating` closure lets us explicitly null out animations in
+    /// the gesture's `Transaction` — which is the only knob that
+    /// reliably stops SwiftUI from springing the offset between
+    /// frames — and the value auto-resets to 0 when the gesture ends,
+    /// in the same render tick as the recorder commit, so there's no
+    /// visual jump.
+    @GestureState private var dragMoveX: CGFloat = 0
+
+    /// Resize-handle state.  Right-handle uses only `dragWidthDelta`.
+    /// Left-handle uses both (offset shifts right, width shrinks by
+    /// the same — so the right edge stays put).
+    @State private var dragWidthDelta: CGFloat = 0
+    @State private var dragLeftResizeX: CGFloat = 0
+
     var body: some View {
-        // Track is only generated once a recording has been
-        // initiated.  Hitting play before any recording happens
-        // moves the playhead but leaves the timeline empty.
         if recorder.isRecording || recorder.recordedDuration > 0 {
-            TrackView(
-                notes: recorder.notes,
-                durationSeconds: recorder.recordedDuration,
-                playheadSeconds: recorder.playheadSeconds,
-                pixelsPerSecond: pixelsPerSecond
-            )
+            trackContent
+                .overlay {
+                    if recorder.isSelected {
+                        selectionFrame
+                    }
+                }
+                .offset(x: CGFloat(recorder.trackStartSec) * pixelsPerSecond
+                           + dragMoveX
+                           + dragLeftResizeX)
         } else {
             EmptyView()
         }
+    }
+
+    /// Track's visible duration during a drag.  Recorder value plus
+    /// the resize width delta, so TrackView's rendered width follows
+    /// the resize gesture without writing @Published every frame.
+    private var effectiveDuration: TimeInterval {
+        max(0,
+            recorder.recordedDuration
+                + TimeInterval(dragWidthDelta / pixelsPerSecond))
+    }
+
+    // MARK: Track + tap-or-move gesture
+
+    /// The track visual, with a unified tap-or-move gesture.  Tap
+    /// (no movement) toggles selection; movement (when already
+    /// selected) drags the track on the timeline.  Combining them
+    /// into one `DragGesture(minimumDistance: 0)` is what lets the
+    /// drag activate instantly — separate tap + drag gestures
+    /// forced a `minimumDistance` of at least 1, which is what felt
+    /// like a "lock" on the first 1pt of motion.
+    private var trackContent: some View {
+        TrackView(
+            notes: recorder.notes,
+            durationSeconds: effectiveDuration,
+            playheadSeconds: recorder.playheadSeconds,
+            pixelsPerSecond: pixelsPerSecond
+        )
+        .contentShape(Rectangle())
+        .highPriorityGesture(tapOrMoveGesture)
+    }
+
+    private var tapOrMoveGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .updating($dragMoveX) { value, state, transaction in
+                // Kill any inherited animation — without this iOS 26
+                // tries to interpolate the offset between frames,
+                // which is the "lag/slow" feel.
+                transaction.animation = nil
+                transaction.disablesAnimations = true
+
+                guard recorder.isSelected else {
+                    state = 0   // only selected tracks move visually
+                    return
+                }
+                let minDx = -CGFloat(recorder.trackStartSec)
+                    * pixelsPerSecond
+                state = max(minDx, value.translation.width)
+            }
+            .onEnded { value in
+                let dx = value.translation.width
+
+                // Treat a near-zero drag as a tap: toggle selection.
+                if abs(dx) < 3 {
+                    recorder.toggleSelection()
+                    return
+                }
+
+                guard recorder.isSelected else { return }
+
+                let minDx = -CGFloat(recorder.trackStartSec)
+                    * pixelsPerSecond
+                let clamped = max(minDx, dx)
+                let deltaSec = TimeInterval(clamped / pixelsPerSecond)
+                recorder.setTrackStartSec(
+                    recorder.trackStartSec + deltaSec)
+                // dragMoveX auto-resets via @GestureState in the
+                // same render tick — no visual jump.
+            }
+    }
+
+    // MARK: Selection frame + edge handles
+
+    /// The white-stroked rectangle that appears around the track
+    /// when it's selected.  Attached via `.overlay`, so it inherits
+    /// the track's exact rendered size — no separate width/height
+    /// math that could drift apart.
+    private var selectionFrame: some View {
+        RoundedRectangle(
+            cornerRadius: TrackView.cornerRadius,
+            style: .continuous
+        )
+        .strokeBorder(.white, lineWidth: 2)
+        .allowsHitTesting(false)
+        // Edge handles, straddling the frame's left and right edges
+        // (half outside, half inside).
+        .overlay(alignment: .leading) {
+            handle(side: .left).offset(x: -2)
+        }
+        .overlay(alignment: .trailing) {
+            handle(side: .right).offset(x: 2)
+        }
+    }
+
+    private enum HandleSide { case left, right }
+
+    /// A small vertical capsule that the user drags to resize the
+    /// track from one edge.  The hit area is generously expanded
+    /// with `.contentShape` so the handle is comfortable to grab.
+    private func handle(side: HandleSide) -> some View {
+        Capsule()
+            .fill(Color.black)
+            .overlay(
+                Capsule().stroke(.white, lineWidth: 1)
+            )
+            .frame(width: 4, height: 32)
+            .contentShape(Rectangle()
+                .inset(by: -14))   // ~32×60 hit target
+            .highPriorityGesture(handleGesture(side: side))
+    }
+
+    private func handleGesture(side: HandleSide) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                let tx = value.translation.width
+                let baseStartPx  = CGFloat(recorder.trackStartSec)
+                    * pixelsPerSecond
+                let baseWidthPx  = CGFloat(recorder.recordedDuration)
+                    * pixelsPerSecond
+                let minWidthPx   = CGFloat(0.5) * pixelsPerSecond
+
+                // Same animation-killing wrapper as the move gesture.
+                var t = Transaction(animation: nil)
+                t.disablesAnimations = true
+                withTransaction(t) {
+                    switch side {
+                    case .left:
+                        let minDx = -baseStartPx
+                        let maxDx = baseWidthPx - minWidthPx
+                        let clamped = min(maxDx, max(minDx, tx))
+                        dragLeftResizeX = clamped
+                        dragWidthDelta  = -clamped
+
+                    case .right:
+                        let minDelta = minWidthPx - baseWidthPx
+                        dragWidthDelta = max(minDelta, tx)
+                    }
+                }
+            }
+            .onEnded { _ in
+                switch side {
+                case .left:
+                    let dxSec = TimeInterval(
+                        dragLeftResizeX / pixelsPerSecond)
+                    recorder.setTrackStartSec(
+                        recorder.trackStartSec + dxSec)
+                    recorder.setRecordedDuration(
+                        recorder.recordedDuration - dxSec)
+                case .right:
+                    let dwSec = TimeInterval(
+                        dragWidthDelta / pixelsPerSecond)
+                    recorder.setRecordedDuration(
+                        recorder.recordedDuration + dwSec)
+                }
+                dragLeftResizeX = 0
+                dragWidthDelta  = 0
+            }
     }
 }
 

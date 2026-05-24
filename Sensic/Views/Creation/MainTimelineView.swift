@@ -56,6 +56,31 @@
 //  Drop this in: Views/Creation/
 //
 
+//
+//  MainTimelineView.swift
+//  Sensic
+//
+//  Workspace › Creation
+//  Main Timeline Area — Adaptive Ruler, Horizontal Zoom, Dynamic Grid,
+//  and a smooth draggable Playhead.
+//
+//  This component has NO background of its own.
+//
+//  Why dragging is smooth
+//  ----------------------
+//  • The playhead position lives in an @Observable model. Only the
+//    small `TLPlayheadLayer` child reads it, so a drag re-renders
+//    ONLY that child — the parent body, ScrollView and Canvas are
+//    never invalidated.
+//  • The playhead is rendered OUTSIDE the timeline's
+//    `.compositingGroup()`, so scrubbing never re-rasterizes the
+//    heavy composited timeline buffer.
+//  • The ruler/grid Canvas is an Equatable subview; it redraws only
+//    on zoom or scroll.
+//
+//  Drop this in: Views/Creation/
+//
+
 import SwiftUI
 
 // MARK: - Layout constants
@@ -391,7 +416,7 @@ struct MainTimelineView: View {
                 TrackOverlay(recorder: recorder,
                              pixelsPerSecond: pixelsPerSecond)
                     .offset(x: TLLayout.rulerLeadingInset,
-                            y: TLLayout.topBarHeight + 6)
+                            y: TLLayout.topBarHeight + 2)
             }
         }
         .scrollPosition($scrollPosition)
