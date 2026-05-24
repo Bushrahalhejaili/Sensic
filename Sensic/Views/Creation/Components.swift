@@ -8,9 +8,9 @@ import UIKit
 // ─────────────────────────────────────────────
 
 let wKW: CGFloat = 56       // White key width
-let wKH: CGFloat = 253      // White key height
+let wKH: CGFloat = 220      // White key height
 let bKW: CGFloat = 36       // Black key width
-let bKH: CGFloat = 160      // Black key height
+let bKH: CGFloat = 139      // Black key height
 let wKSpacing: CGFloat = 2  // Gap between adjacent white keys
 let keyCornerRadius: CGFloat = 10  // Bottom-corner radius (white + black)
 
@@ -575,143 +575,5 @@ struct SensicGlassTransportBar<Content: View>: View {
                         lineWidth: 1
                     )
             )
-    }
-}
-
-// ─────────────────────────────────────────────
-// MARK: - TimelineView
-// ─────────────────────────────────────────────
-
-struct TimelineView: View {
-    let isRecording: Bool
-    let noteHistory: [NoteEvent]
-    let elapsed: TimeInterval
-
-    private let visibleSeconds: Double = 17
-    private let rulerHeight: CGFloat = 28
-    private let measureLabels = [1, 5, 9, 13, 17]
-
-    var body: some View {
-        GeometryReader { geo in
-            let width = geo.size.width
-            let height = geo.size.height
-            let gridHeight = max(0, height - rulerHeight)
-            let playheadX = min(
-                CGFloat(elapsed / visibleSeconds) * width,
-                max(0, width - 2)
-            )
-
-            ZStack(alignment: .topLeading) {
-                Color("SpaceBlue")
-
-                timelineRuler(width: width)
-
-                ZStack(alignment: .topLeading) {
-                    gridLines(width: width, height: gridHeight)
-                    noteBlocks(width: width, height: gridHeight)
-                }
-                .frame(width: width, height: gridHeight)
-                .offset(y: rulerHeight)
-
-                playhead(x: playheadX, gridHeight: gridHeight)
-            }
-        }
-    }
-
-    private func timelineRuler(width: CGFloat) -> some View {
-        ZStack(alignment: .leading) {
-            Rectangle()
-                .fill(Color.white.opacity(0.06))
-                .frame(height: 1)
-                .offset(y: rulerHeight - 1)
-
-            ForEach(measureLabels, id: \.self) { measure in
-                let x = CGFloat(measure) / CGFloat(visibleSeconds) * width
-                Text("\(measure)")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color("tertiary"))
-                    .position(x: x, y: rulerHeight / 2)
-            }
-        }
-        .frame(height: rulerHeight)
-    }
-
-    private func gridLines(width: CGFloat, height: CGFloat) -> some View {
-        ForEach(0..<18, id: \.self) { index in
-            let x = CGFloat(index) / CGFloat(visibleSeconds) * width
-            Rectangle()
-                .fill(Color("MainPurple").opacity(index % 4 == 0 ? 0.22 : 0.08))
-                .frame(width: 1)
-                .frame(height: height)
-                .offset(x: x)
-        }
-    }
-
-    private func noteBlocks(width: CGFloat, height: CGFloat) -> some View {
-        ForEach(noteHistory.indices, id: \.self) { index in
-            let note = noteHistory[index]
-            let x = CGFloat(note.timestamp / visibleSeconds) * width
-            let barHeight = CGFloat(note.velocity) / 127 * (height * 0.45) + 6
-            let lane = CGFloat(note.midiNote - 21) / 88 * (height * 0.55) + 12
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(Color("MainPurple").opacity(0.9))
-                .frame(
-                    width: max(4, CGFloat(max(note.duration, 0.05) / visibleSeconds) * width),
-                    height: barHeight
-                )
-                .offset(x: min(x, width - 4), y: lane)
-        }
-    }
-
-    private func playhead(x: CGFloat, gridHeight: CGFloat) -> some View {
-        VStack(spacing: 0) {
-            Image(systemName: "diamond.fill")
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(Color("MainPurple"))
-                .frame(height: rulerHeight)
-
-            Rectangle()
-                .fill(Color("MainPurple"))
-                .frame(width: 1.5, height: gridHeight)
-        }
-        .offset(x: max(0, x - 0.75))
-        .animation(isRecording ? .linear(duration: 0.5) : nil, value: elapsed)
-    }
-}
-
-// ─────────────────────────────────────────────
-// MARK: - NewSessionSheet
-// ─────────────────────────────────────────────
-
-struct NewSessionSheet: View {
-    @Binding var title: String
-    let onStart: () -> Void
-    let onCancel: () -> Void
-
-    var body: some View {
-        VStack(spacing: 20) {
-            Text("New Session").font(.headline).foregroundStyle(.white).padding(.top, 8)
-            TextField("Session title...", text: $title)
-                .padding(14).background(Color("Navy"))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color("MainPurple").opacity(0.3), lineWidth: 0.5))
-                .foregroundStyle(.white)
-                .onSubmit { if !title.isEmpty { onStart() } }
-            HStack(spacing: 12) {
-                Button("Cancel", action: onCancel)
-                    .frame(maxWidth: .infinity).padding(14)
-                    .background(Color("Navy")).foregroundStyle(Color("tertiary"))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                Button("Start") { if !title.isEmpty { onStart() } }
-                    .frame(maxWidth: .infinity).padding(14)
-                    .background(title.isEmpty ? Color("MainPurple").opacity(0.4) : Color("MainPurple"))
-                    .foregroundStyle(.white).fontWeight(.semibold)
-                    .clipShape(RoundedRectangle(cornerRadius: 14)).disabled(title.isEmpty)
-            }
-            Spacer()
-        }
-        .padding(24).background(Color("SpaceBlue"))
-        .presentationDetents([.fraction(0.32)]).presentationDragIndicator(.visible)
     }
 }

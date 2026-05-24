@@ -12,18 +12,16 @@ struct CreationView: View {
     @Bindable var store: RecordingsStore
     var onSavedToRecordings: (() -> Void)?
 
+    // recordVM is still here because PianoWithScroller takes it and
+    // the piano keys need a model for live audio + visual feedback.
+    // None of its recording APIs are called from this view anymore.
     @StateObject private var recordVM = RecordViewModel()
     @StateObject private var practiceVM = PracticeViewModel()
     @StateObject private var scrollState = PianoScrollState()
+    @StateObject private var recorder = TrackRecorder()
 
     @State private var activeTab: Tab = .record
     @State private var showSettings = false
-    @State private var showSaveDialog = false
-    @State private var showSaveError = false
-    @State private var showExitDialog = false
-    @State private var saveErrorMessage = ""
-    @State private var saveTitle = ""
-    @State private var saveNavigatesToRecordings = true
 
     enum Tab: Hashable { case record, practice }
 
@@ -43,51 +41,15 @@ struct CreationView: View {
                     PracticeView(vm: practiceVM)
                 }
             }
-
-            if showSaveDialog {
-                Color.black.opacity(0.55)
-                    .ignoresSafeArea()
-                    .transition(.opacity)
-
-                EnterNameGlassAlert(
-                    title: $saveTitle,
-                    onSave: {
-                        showSaveDialog = false
-                        persistRecording(title: saveTitle, navigateToRecordings: saveNavigatesToRecordings)
-                    },
-                    onCancel: { showSaveDialog = false }
-                )
-                .padding(.horizontal, 24)
-                .transition(.scale(scale: 0.94).combined(with: .opacity))
-            }
         }
-        .animation(.spring(response: 0.38, dampingFraction: 0.86), value: showSaveDialog)
         .preferredColorScheme(.dark)
         .toolbar(.hidden, for: .navigationBar)
-        .alert("Cannot save", isPresented: $showSaveError) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(saveErrorMessage)
+        .onAppear {
+            // Subscribe the recorder to live key presses on the
+            // Record-tab piano.  Notes are only captured while the
+            // recorder's `isRecording` flag is true.
+            recorder.bind(to: recordVM)
         }
-        .confirmationDialog(
-            "Unsaved recording",
-            isPresented: $showExitDialog,
-            titleVisibility: .visible
-        ) {
-            Button("Save") {
-                saveNavigatesToRecordings = false
-                prepareSaveTitle()
-                showSaveDialog = true
-            }
-            Button("Delete", role: .destructive) {
-                recordVM.discardRecording()
-                dismiss()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Do you want to save this recording or delete it?")
-        }
-        .preferredColorScheme(.dark)
     }
 
     // MARK: - Header
@@ -98,7 +60,7 @@ struct CreationView: View {
                 icon: "chevron.left",
                 iconSize: 20,
                 iconColor: .white,
-                action: attemptGoBack
+                action: { dismiss() }
             )
 
             Spacer(minLength: 0)
@@ -112,7 +74,7 @@ struct CreationView: View {
                     icon: "checkmark",
                     iconSize: 20,
                     iconColor: .white,
-                    action: presentSaveSheet
+                    action: {} // no-op
                 )
             } else {
                 Color.clear
@@ -122,8 +84,6 @@ struct CreationView: View {
         }
     }
 
-    // Custom segmented control — solid Navy capsule with a MainPurple
-    // thumb that slides between segments.
     @Namespace private var segNamespace
 
     private var segmentPicker: some View {
@@ -164,21 +124,22 @@ struct CreationView: View {
 
     private var recordWorkspace: some View {
         VStack(spacing: 0) {
+            Spacer(minLength: 0)
+
             toolBar
                 .padding(.horizontal, 16)
                 .padding(.top, 20)
                 .padding(.bottom, 10)
 
-            MainTimelineView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .layoutPriority(1)
+            MainTimelineView(recorder: recorder)
+                .frame(maxWidth: .infinity)
 
             PianoWithScroller(
                 vm: recordVM,
                 scrollState: scrollState
             )
             .frame(height: CreationLayout.pianoBlockHeight)
-            .padding(.top, 10)
+            .padding(.top, 30)
             .padding(.bottom, 9)
         }
         .ignoresSafeArea(.container, edges: .bottom)
@@ -188,20 +149,23 @@ struct CreationView: View {
 
     private var toolBar: some View {
         HStack(spacing: 0) {
-            // Left cluster: undo, redo, controls (10 between each)
             HStack(spacing: 10) {
                 glassCircleButton(
                     icon: "arrow.uturn.backward",
                     iconSize: 20,
-                    enabled: recordVM.canUndo,
-                    action: { recordVM.undo() }
+                    iconColor: recorder.canUndo
+                        ? Color("MainPurple")
+                        : Color("MainPurple").opacity(0.35),
+                    action: { recorder.undoTapped() }
                 )
 
                 glassCircleButton(
                     icon: "arrow.uturn.forward",
                     iconSize: 20,
-                    enabled: recordVM.canRedo,
-                    action: { recordVM.redo() }
+                    iconColor: recorder.canRedo
+                        ? Color("MainPurple")
+                        : Color("MainPurple").opacity(0.35),
+                    action: { recorder.redoTapped() }
                 )
 
                 glassCircleButton(
@@ -222,7 +186,7 @@ struct CreationView: View {
         }
     }
 
-    // Shared angular gradient for glass rim.
+    // Shared angular gradient for the glass rim.
     private var glassShineGradient: AngularGradient {
         AngularGradient(
             gradient: Gradient(colors: [
@@ -241,7 +205,6 @@ struct CreationView: View {
         icon: String,
         iconSize: CGFloat,
         iconColor: Color = Color("MainPurple"),
-        enabled: Bool = true,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -263,42 +226,50 @@ struct CreationView: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .opacity(enabled ? 1 : 0.35)
-        .disabled(!enabled)
     }
 
     // MARK: - Transport bar
 
+    /// Green tint for the play button while the playhead is
+    /// advancing (whether the user is in a recording or playback
+    /// session).
+    private var activeGreen: Color {
+        Color(red: 0.30, green: 0.85, blue: 0.40)
+    }
+
+    /// Light grey tint for the stop button while the playhead is
+    /// advancing — visually softens it without making it look
+    /// disabled.
+    private var activeGrey: Color {
+        Color(white: 0.65)
+    }
+
     private var transportBar: some View {
-        // True whenever something is happening — recording or playback.
-        let isActive = recordVM.isRecording || recordVM.isPlaying
-        let activeGreen = Color(red: 0.30, green: 0.85, blue: 0.40)
-        let activeGrey  = Color(white: 0.65)
+        // Read the two state flags up front so the closures don't
+        // capture the recorder reference more than necessary.
+        let isAdvancing = recorder.isAdvancing
+        let isRecording = recorder.isRecording
 
         return HStack(spacing: 4) {
-            transportIcon("backward.fill") {}
-            transportIcon("forward.fill")  {}
-
+            transportIcon("backward.fill") { recorder.skipBackwardTapped() }
+            transportIcon("forward.fill")  { recorder.skipForwardTapped() }
             transportIcon(
                 "stop.fill",
-                color: isActive ? activeGrey : .white
-            ) {
-                recordVM.stopPlayback()
-                if recordVM.isRecording {
-                    _ = recordVM.stopRecording()
-                }
-            }
-
+                color: isAdvancing ? activeGrey : .white,
+                action: { recorder.stopTapped() }
+            )
             transportIcon(
                 "play.fill",
-                color: isActive ? activeGreen : .white
-            ) {
-                recordVM.togglePlayback()
-            }
-            .opacity(recordVM.canSave ? 1 : 0.35)
-            .disabled(!recordVM.canSave)
-
-            recordIconButton
+                color: isAdvancing ? activeGreen : .white,
+                action: { recorder.playTapped() }
+            )
+            transportIcon(
+                "circle.fill",
+                size: 17,
+                weight: .bold,
+                color: isRecording ? Color("RecordingRed") : .white,
+                action: { recorder.recordTapped() }
+            )
         }
         .frame(width: 171, height: 44)
         .background(
@@ -312,107 +283,24 @@ struct CreationView: View {
                 )
                 .glassEffect(.clear.interactive())
         )
-        .animation(.easeInOut(duration: 0.2), value: isActive)
     }
 
     private func transportIcon(
         _ name: String,
+        size: CGFloat = 20,
+        weight: Font.Weight = .semibold,
         color: Color = .white,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             Image(systemName: name)
-                .font(.system(size: 20, weight: .semibold))
+                .font(.system(size: size, weight: weight))
                 .foregroundStyle(color)
         }
         .buttonStyle(.plain)
-    }
-
-    private var recordIconButton: some View {
-        Button(action: toggleRecording) {
-            Image(systemName: "circle.fill")
-                .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(recordVM.isRecording
-                                 ? Color("RecordingRed") : .white)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func toggleRecording() {
-        if recordVM.isRecording {
-            _ = recordVM.stopRecording()
-        } else {
-            recordVM.startRecording()
-        }
-    }
-
-    // MARK: - Navigation & save
-
-    private func attemptGoBack() {
-        if activeTab == .practice {
-            dismiss()
-            return
-        }
-
-        if recordVM.hasUnsavedWork {
-            showExitDialog = true
-        } else {
-            dismiss()
-        }
-    }
-
-    private func presentSaveSheet() {
-        saveNavigatesToRecordings = true
-        if recordVM.isRecording {
-            _ = recordVM.stopRecording()
-        }
-
-        guard recordVM.canSave else {
-            saveErrorMessage = "Nothing recorded yet. Record notes before saving."
-            showSaveError = true
-            return
-        }
-
-        prepareSaveTitle()
-        showSaveDialog = true
-    }
-
-    private func prepareSaveTitle() {
-        saveTitle = recordVM.sessionTitle
-    }
-
-    private func persistRecording(title: String, navigateToRecordings: Bool) {
-        if recordVM.isRecording {
-            _ = recordVM.stopRecording()
-        }
-
-        guard recordVM.canSave else {
-            saveErrorMessage = "Nothing recorded yet. Record notes before saving."
-            showSaveError = true
-            return
-        }
-
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-
-        store.savePiece(
-            title: trimmed,
-            duration: recordVM.sessionDuration,
-            noteEvents: recordVM.eventsForPlayback
-        )
-        store.showToast("Saved to Recordings")
-        recordVM.discardRecording()
-
-        if navigateToRecordings {
-            dismiss()
-            onSavedToRecordings?()
-        } else {
-            dismiss()
-        }
     }
 }
 
 #Preview {
     CreationView(store: .previewInstance())
-//        .preferredColorScheme(.dark)
 }

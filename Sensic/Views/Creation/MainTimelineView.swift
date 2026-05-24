@@ -31,6 +31,31 @@
 //  Drop this in: Views/Creation/
 //
 
+//
+//  MainTimelineView.swift
+//  Sensic
+//
+//  Workspace › Creation
+//  Main Timeline Area — Adaptive Ruler, Horizontal Zoom, Dynamic Grid,
+//  and a smooth draggable Playhead.
+//
+//  This component has NO background of its own.
+//
+//  Why dragging is smooth
+//  ----------------------
+//  • The playhead position lives in an @Observable model. Only the
+//    small `TLPlayheadLayer` child reads it, so a drag re-renders
+//    ONLY that child — the parent body, ScrollView and Canvas are
+//    never invalidated.
+//  • The playhead is rendered OUTSIDE the timeline's
+//    `.compositingGroup()`, so scrubbing never re-rasterizes the
+//    heavy composited timeline buffer.
+//  • The ruler/grid Canvas is an Equatable subview; it redraws only
+//    on zoom or scroll.
+//
+//  Drop this in: Views/Creation/
+//
+
 import SwiftUI
 
 // MARK: - Layout constants
@@ -313,6 +338,13 @@ private struct TLPlayheadLayer: View {
 
 struct MainTimelineView: View {
 
+    /// Recording session state — owns the captured notes and drives
+    /// the playhead during recording / playback. The parent body
+    /// does NOT observe it (kept as a `let`) so the heavy timeline
+    /// body doesn't re-render at 60Hz; only the `TrackOverlay`
+    /// subview observes the recorder and re-renders on each tick.
+    let recorder: TrackRecorder
+
     private let tickColor = Color.indigoBlue
     private let gridColor = Color.gray.opacity(0.2)
     private let playheadLineColor = Color.lavender    // asset "Lavender"
@@ -344,13 +376,23 @@ struct MainTimelineView: View {
     }
 
     private var scrollableGrid: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            TLGridCanvas(pixelsPerBar: pixelsPerBar,
-                         scrollOffsetX: scrollOffsetX,
-                         visibleWidth: stripWidth,
-                         tickColor: tickColor,
-                         gridColor: gridColor)
-                .equatable()
+        let pixelsPerBeat = pixelsPerBar / CGFloat(TLLayout.beatsPerBar)
+        let pixelsPerSecond = pixelsPerBeat * CGFloat(recorder.bpm / 60)
+
+        return ScrollView(.horizontal, showsIndicators: false) {
+            ZStack(alignment: .topLeading) {
+                TLGridCanvas(pixelsPerBar: pixelsPerBar,
+                             scrollOffsetX: scrollOffsetX,
+                             visibleWidth: stripWidth,
+                             tickColor: tickColor,
+                             gridColor: gridColor)
+                    .equatable()
+
+                TrackOverlay(recorder: recorder,
+                             pixelsPerSecond: pixelsPerSecond)
+                    .offset(x: TLLayout.rulerLeadingInset,
+                            y: TLLayout.topBarHeight + 6)
+            }
         }
         .scrollPosition($scrollPosition)
         .frame(width: stripWidth, height: TLLayout.containerHeight)
@@ -439,17 +481,28 @@ struct MainTimelineView: View {
                        alignment: .topTrailing)
                 .clipShape(RoundedRectangle(
                     cornerRadius: TLLayout.containerRadius))
-//                .animation(.easeOut(duration: 0.2), value: stripWidth)
+                .animation(.easeOut(duration: 0.2), value: stripWidth)
         }
         .frame(width: TLLayout.containerWidth,
                height: TLLayout.containerHeight)
+        .onReceive(recorder.$playheadSeconds) { seconds in
+            // While the recorder is advancing the playhead, push
+            // the converted beat value into the timeline's model.
+            // This subscription doesn't invalidate the body — only
+            // the small TLPlayheadLayer child re-renders on each
+            // model update.
+            if recorder.isAdvancing {
+                let beats = seconds * recorder.bpm / 60
+                playhead.beat = min(beats, metrics.totalBeats)
+            }
+        }
     }
 }
 
 // MARK: - Preview
 
 #Preview {
-    MainTimelineView()
+    MainTimelineView(recorder: TrackRecorder())
         .padding()
         .preferredColorScheme(.dark)
 }
