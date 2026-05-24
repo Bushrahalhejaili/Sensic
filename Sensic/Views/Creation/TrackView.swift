@@ -11,16 +11,6 @@
 //  three-part visual described in the design spec.
 //
 //
-//  TrackView.swift
-//  Sensic
-//
-//  Workspace › Creation
-//  A recordable track that lives inside MainTimelineView. Owns the
-//  recording session state (notes + playhead) and renders the
-//  three-part visual described in the design spec.
-//
-//  Drop this in: Views/Creation/
-//
 
 import SwiftUI
 import Combine

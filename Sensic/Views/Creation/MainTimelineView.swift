@@ -1,15 +1,10 @@
 //
-//  TimelineConfiguration.swift
+//  MainTimelineView.swift
 //  Sensic
 //
 //  Created by Bushra Hatim Alhejaili on 19/05/2026.
 //
 
-
-//
-//  MainTimelineView.swift
-//  Sensic
-//
 //  Workspace › Creation
 //  Main Timeline Area — Adaptive Ruler, Horizontal Zoom, Dynamic Grid,
 //  and a smooth draggable Playhead.
@@ -31,55 +26,7 @@
 //  Drop this in: Views/Creation/
 //
 
-//
-//  MainTimelineView.swift
-//  Sensic
-//
-//  Workspace › Creation
-//  Main Timeline Area — Adaptive Ruler, Horizontal Zoom, Dynamic Grid,
-//  and a smooth draggable Playhead.
-//
-//  This component has NO background of its own.
-//
-//  Why dragging is smooth
-//  ----------------------
-//  • The playhead position lives in an @Observable model. Only the
-//    small `TLPlayheadLayer` child reads it, so a drag re-renders
-//    ONLY that child — the parent body, ScrollView and Canvas are
-//    never invalidated.
-//  • The playhead is rendered OUTSIDE the timeline's
-//    `.compositingGroup()`, so scrubbing never re-rasterizes the
-//    heavy composited timeline buffer.
-//  • The ruler/grid Canvas is an Equatable subview; it redraws only
-//    on zoom or scroll.
-//
-//  Drop this in: Views/Creation/
-//
 
-//
-//  MainTimelineView.swift
-//  Sensic
-//
-//  Workspace › Creation
-//  Main Timeline Area — Adaptive Ruler, Horizontal Zoom, Dynamic Grid,
-//  and a smooth draggable Playhead.
-//
-//  This component has NO background of its own.
-//
-//  Why dragging is smooth
-//  ----------------------
-//  • The playhead position lives in an @Observable model. Only the
-//    small `TLPlayheadLayer` child reads it, so a drag re-renders
-//    ONLY that child — the parent body, ScrollView and Canvas are
-//    never invalidated.
-//  • The playhead is rendered OUTSIDE the timeline's
-//    `.compositingGroup()`, so scrubbing never re-rasterizes the
-//    heavy composited timeline buffer.
-//  • The ruler/grid Canvas is an Equatable subview; it redraws only
-//    on zoom or scroll.
-//
-//  Drop this in: Views/Creation/
-//
 
 import SwiftUI
 
