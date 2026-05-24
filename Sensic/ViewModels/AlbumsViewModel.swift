@@ -63,8 +63,10 @@ final class AlbumsViewModel {
         guard let index = albums.firstIndex(where: { $0.id == album.id }) else { return }
 
         let newIDs = recordings.map(\.id)
+        let existing = Set(albums[index].pieceIDs)
+        let uniqueIDs = newIDs.filter { !existing.contains($0) }
 
-        albums[index].pieceIDs.append(contentsOf: newIDs)
+        albums[index].pieceIDs.append(contentsOf: uniqueIDs)
     }
     
     // MARK: - Get Recordings for Album
@@ -72,6 +74,33 @@ final class AlbumsViewModel {
     func recordings(for album: Album) -> [RecordingItem] {
         allRecordings.filter {
             album.pieceIDs.contains($0.id)
+        }
+    }
+
+    // MARK: - Recording actions (album context)
+
+    func renameRecording(id: UUID, title: String) -> Bool {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        guard let index = allRecordings.firstIndex(where: { $0.id == id }) else { return false }
+        allRecordings[index].title = trimmed
+        return true
+    }
+
+    func removeRecording(id: UUID, fromAlbumID albumID: UUID) {
+        guard let index = albums.firstIndex(where: { $0.id == albumID }) else { return }
+        albums[index].pieceIDs.removeAll { $0 == id }
+    }
+
+    func moveRecording(id: UUID, fromAlbumID sourceID: UUID, toAlbumID destinationID: UUID) {
+        guard sourceID != destinationID else { return }
+        guard let sourceIndex = albums.firstIndex(where: { $0.id == sourceID }) else { return }
+        guard let destinationIndex = albums.firstIndex(where: { $0.id == destinationID }) else { return }
+
+        albums[sourceIndex].pieceIDs.removeAll { $0 == id }
+
+        if !albums[destinationIndex].pieceIDs.contains(id) {
+            albums[destinationIndex].pieceIDs.append(id)
         }
     }
 }
