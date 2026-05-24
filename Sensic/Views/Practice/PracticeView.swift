@@ -10,30 +10,16 @@ struct PracticeView: View {
     @StateObject private var scrollState = PianoScrollState()
     @StateObject private var visualizer = PracticeVisualizerModel()
 
-    @State private var hapticIntensity: Float = 0.7
-    @State private var hapticSharpness: Float = 0.5
-    @State private var hapticStyle: HapticStyle = .smooth
-
     var body: some View {
         VStack(spacing: 12) {
             PracticeNoteVisualizerGrid(model: visualizer)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.horizontal, 16)
-            .layoutPriority(1)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.horizontal, 16)
+                .layoutPriority(1)
 
-            HapticControlsView(
-                intensity: $hapticIntensity,
-                sharpness: $hapticSharpness,
-                style: $hapticStyle
-            )
-            .padding(.horizontal, 16)
-
-            PianoWithMinimap(
+            PianoWithScroller(
                 vm: recordVM,
-                scrollState: scrollState,
-                hapticIntensity: hapticIntensity,
-                hapticSharpness: hapticSharpness,
-                hapticStyle: hapticStyle
+                scrollState: scrollState
             )
             .frame(height: CreationLayout.pianoBlockHeight)
         }
