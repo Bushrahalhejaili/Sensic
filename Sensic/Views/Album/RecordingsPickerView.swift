@@ -7,19 +7,12 @@
 
 import SwiftUI
 
-// MARK: - Model
-
-struct RecordingItem: Identifiable, Equatable {
-        let id = UUID()
-        let title: String
-        let duration: String
-        let date: String
-    }
 // MARK: - View
 
 struct RecordingsPickerView: View {
 
     let album: Album
+    let recordings: [RecordingItem]
     let onSave: ([RecordingItem]) -> Void
     
     @Environment(\.dismiss) private var dismiss
@@ -27,51 +20,6 @@ struct RecordingsPickerView: View {
     @State private var searchText = ""
 
     @State private var selectedRecordings: Set<UUID> = []
-
-    let recordings: [RecordingItem] = [
-
-        .init(
-            title: "Buzzkiller",
-            duration: "4:07",
-            date: "12:07 PM"
-        ),
-
-        .init(
-            title: "Ego Death At Ba...",
-            duration: "3:19",
-            date: "Yesterday"
-        ),
-
-        .init(
-            title: "Pink Light",
-            duration: "4:11",
-            date: "Sunday"
-        ),
-
-        .init(
-            title: "Stayaway",
-            duration: "3:31",
-            date: "Wednesday"
-        ),
-
-        .init(
-            title: "Downfall",
-            duration: "4:15",
-            date: "Apr 27, 2026"
-        ),
-
-        .init(
-            title: "All them horses",
-            duration: "5:13",
-            date: "Apr 28, 2026"
-        ),
-
-        .init(
-            title: "Shooting Star",
-            duration: "3:52",
-            date: "Apr 29, 2026"
-        )
-    ]
 
     var body: some View {
 
@@ -366,14 +314,15 @@ extension RecordingsPickerView {
 // MARK: - Preview
 #Preview {
 
+    let vm = AlbumsViewModel()
+
     RecordingsPickerView(
         album: Album(
             id: UUID(),
             name: "The great divide",
             pieceIDs: []
         ),
-        onSave: { _ in
-
-        }
+        recordings: vm.allRecordings,
+        onSave: { _ in }
     )
 }

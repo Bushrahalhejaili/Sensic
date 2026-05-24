@@ -14,6 +14,11 @@ struct AlbumDetailsView: View {
     @State private var showRecordingsPicker = false
     @State private var isEditingTitle = false
     @State private var albumName = ""
+    @State private var revealedRecordingID: UUID?
+    @State private var recordingPendingRename: RecordingItem?
+    @State private var recordingPendingMove: RecordingItem?
+    @State private var recordingPendingDelete: RecordingItem?
+    @State private var recordingPendingDetail: RecordingItem?
 
     @FocusState private var isTextFieldFocused: Bool
 
@@ -55,52 +60,25 @@ struct AlbumDetailsView: View {
                         if let album = currentAlbum {
 
                             ForEach(vm.recordings(for: album), id: \.id) { recording in
-
-                                RoundedRectangle(cornerRadius: 30)
-                                    .fill(
-                                        Color(
-                                            red: 16 / 255,
-                                            green: 22 / 255,
-                                            blue: 58 / 255
-                                        )
-                                    )
-                                    .frame(height: 105)
-                                    .overlay {
-
-                                        HStack {
-
-                                            VStack(
-                                                alignment: .leading,
-                                                spacing: 12
-                                            ) {
-
-                                                HStack {
-
-                                                    Text(recording.title)
-                                                        .font(.system(size: 22, weight: .medium))
-                                                        .foregroundStyle(.white)
-
-                                                    Spacer()
-
-                                                    Text(recording.date)
-                                                        .font(.system(size: 14))
-                                                        .foregroundStyle(.gray)
-                                                }
-
-                                                HStack(spacing: 10) {
-
-                                                    Image(systemName: "waveform")
-                                                        .foregroundStyle(.white)
-
-                                                    Text(recording.duration)
-                                                        .foregroundStyle(.gray)
-                                                }
-                                            }
-
-                                            Spacer()
-                                        }
-                                        .padding(.horizontal, 22)
+                                AlbumRecordingSwipeRow(
+                                    recording: recording,
+                                    revealedRecordingID: $revealedRecordingID,
+                                    onRename: {
+                                        revealedRecordingID = nil
+                                        recordingPendingRename = recording
+                                    },
+                                    onMove: {
+                                        revealedRecordingID = nil
+                                        recordingPendingMove = recording
+                                    },
+                                    onDelete: {
+                                        revealedRecordingID = nil
+                                        recordingPendingDelete = recording
+                                    },
+                                    onDetail: {
+                                        recordingPendingDetail = recording
                                     }
+                                )
                             }
                         }
                     }
@@ -118,11 +96,51 @@ struct AlbumDetailsView: View {
 
             if let album = currentAlbum {
 
-                RecordingsPickerView(album: album) { selectedItems in
-                    vm.addRecordings(selectedItems, to: album)                }
+                RecordingsPickerView(album: album, recordings: vm.allRecordings) { selectedItems in
+                    vm.addRecordings(selectedItems, to: album)
+                }
             }
         }
 
+        .sheet(item: $recordingPendingRename) { recording in
+            RenameAlbumRecordingSheet(recording: recording) { newTitle in
+                vm.renameRecording(id: recording.id, title: newTitle)
+            }
+        }
+        .sheet(item: $recordingPendingMove) { recording in
+            MoveRecordingSheet(
+                recording: recording,
+                currentAlbumID: albumID,
+                albums: vm.albums
+            ) { destinationID in
+                vm.moveRecording(
+                    id: recording.id,
+                    fromAlbumID: albumID,
+                    toAlbumID: destinationID
+                )
+            }
+        }
+        .sheet(item: $recordingPendingDetail) { recording in
+            AlbumRecordingDetailSheet(recording: recording)
+        }
+        .alert(
+            "Remove from album?",
+            isPresented: Binding(
+                get: { recordingPendingDelete != nil },
+                set: { if !$0 { recordingPendingDelete = nil } }
+            ),
+            presenting: recordingPendingDelete
+        ) { recording in
+            Button("Remove", role: .destructive) {
+                vm.removeRecording(id: recording.id, fromAlbumID: albumID)
+                recordingPendingDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                recordingPendingDelete = nil
+            }
+        } message: { recording in
+            Text("“\(recording.title)” will be removed from this album.")
+        }
         .onAppear {
             albumName = currentAlbum?.name ?? ""
         }
