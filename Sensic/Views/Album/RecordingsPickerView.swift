@@ -286,8 +286,9 @@ extension RecordingsPickerView {
                             weight: .bold
                         )
                     )
-                    .foregroundStyle( isSelected ? Color("MainPurple") : Color.purple.opacity(0.8)
-                                        )
+                    .foregroundStyle(
+                        isSelected ? Color("MainPurple") : Color.purple.opacity(0.8)
+                    )
                 }
             }
         }
