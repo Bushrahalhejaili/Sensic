@@ -5,24 +5,6 @@
 //  Created by Bushra Hatim Alhejaili on 19/05/2026.
 //
 
-//  Workspace › Creation
-//  Main Timeline Area — Adaptive Ruler, Horizontal Zoom, Dynamic Grid,
-//  and a smooth draggable Playhead.
-//
-//  This component has NO background of its own.
-//
-//  Why dragging is smooth
-//  ----------------------
-//  • The playhead position lives in an @Observable model. Only the
-//    small `TLPlayheadLayer` child reads it, so a drag re-renders
-//    ONLY that child — the parent body, ScrollView and Canvas are
-//    never invalidated.
-//  • The playhead is rendered OUTSIDE the timeline's
-//    `.compositingGroup()`, so scrubbing never re-rasterizes the
-//    heavy composited timeline buffer.
-//  • The ruler/grid Canvas is an Equatable subview; it redraws only
-//    on zoom or scroll.
-//
 //
 //  MainTimelineView.swift
 //  Sensic
@@ -310,18 +292,18 @@ private struct TLPlayheadLayer: View {
                     .contentShape(Rectangle())
                     .overlay {
                         UIKitDragGesture(
-                            onChanged: { tx in
+                            onChanged: { translation in
                                 let rawDelta = Double(
-                                    tx / metrics.pixelsPerBeat)
+                                    translation.x / metrics.pixelsPerBeat)
                                 let target = model.beat + rawDelta
                                 let clamped = min(
                                     max(0, target),
                                     metrics.totalBeats)
                                 dragBeatDelta = clamped - model.beat
                             },
-                            onEnded: { tx in
+                            onEnded: { translation in
                                 let rawDelta = Double(
-                                    tx / metrics.pixelsPerBeat)
+                                    translation.x / metrics.pixelsPerBeat)
                                 let target = model.beat + rawDelta
                                 model.beat = min(
                                     max(0, target),
@@ -552,6 +534,83 @@ struct MainTimelineView: View {
                 }
             }
         }
+        // Register the archive hook with the primary recorder.
+        // Whenever the user taps record while the primary already
+        // holds a finished take, this callback fires BEFORE the
+        // recorder clears itself — giving us a chance to snapshot
+        // the old take into a fresh snapshot-track on the next row.
+        .onAppear {
+            recorder.willBeginFreshRecording = {
+                archivePreviousRecording()
+            }
+        }
+    }
+
+    /// Called by the primary recorder's `willBeginFreshRecording`
+    /// hook RIGHT BEFORE it clears its state.  If the primary
+    /// currently holds a finished take, we snapshot it into a new
+    /// `TrackRecorder` (placed on the next free row) so the
+    /// previous recording survives the upcoming clear.  We also
+    /// drop the primary's per-note undo entries (they reference
+    /// notes that are now owned by the snapshot track) and push
+    /// the whole archive as a single undoable action so undo can
+    /// reverse the re-record.
+    ///
+    /// Soft-deleted primaries are skipped: the user explicitly
+    /// asked for that data to be gone, so we don't ressurect it
+    /// behind their back.
+    private func archivePreviousRecording() {
+        guard recorder.recordedDuration > 0,
+              !recorder.notes.isEmpty,
+              !recorder.isDeleted
+        else { return }
+
+        let snapshot = TrackSnapshot(
+            notes:    recorder.notes,
+            duration: recorder.recordedDuration,
+            name:     recorder.trackName)
+        let savedStartSec = recorder.trackStartSec
+        let savedRow      = recorder.trackRow
+
+        // Place the archive in the next free row underneath
+        // everything currently on the timeline.
+        let occupiedRows = [recorder.trackRow]
+            + pastedTracks.map { $0.trackRow }
+        let newRow = (occupiedRows.max() ?? 0) + 1
+
+        let archived = TrackRecorder()
+        archived.loadSnapshot(snapshot, atStartSec: savedStartSec)
+        archived.trackRow = newRow
+        if let vm = recorder.audioOutput {
+            archived.bind(to: vm)
+        }
+        pastedTracks.append(archived)
+
+        // The primary's old per-note undo entries reference notes
+        // that now live on `archived` instead.  Dropping them here
+        // keeps the undo button from no-op'ing on stale ids later.
+        recorder.clearNoteHistory()
+
+        let primary = recorder
+        recorder.pushUndoableAction(
+            TrackRecorder.UndoableAction(
+                undo: {
+                    // Reverse the archive: put the snapshot back
+                    // onto the primary and hide the archived copy.
+                    primary.restoreFromSnapshot(
+                        snapshot,
+                        atStartSec: savedStartSec,
+                        trackRow: savedRow)
+                    archived.deleteTrack()
+                },
+                redo: {
+                    // Replay the archive: clear the primary again
+                    // and re-show the snapshot track.
+                    primary.clearForRerecord()
+                    archived.undelete()
+                }
+            )
+        )
     }
 
     // MARK: Edit-menu plumbing

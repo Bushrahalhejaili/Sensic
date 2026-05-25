@@ -11,6 +11,7 @@
 //  three-part visual described in the design spec.
 //
 //
+
 //
 //  TrackView.swift
 //  Sensic
@@ -39,14 +40,16 @@ import UIKit
 /// - `onTap`:     fires on a quick tap that doesn't move.  Omit
 ///                (pass `nil`) on views that should only pan.
 /// - `onChanged`: fires repeatedly during the pan with the
-///                cumulative x-axis translation since touch start.
+///                cumulative translation (x, y) since touch start.
+///                Sites that only care about horizontal motion can
+///                just read `.x` and ignore `.y`.
 /// - `onEnded`:   fires once at .ended/.cancelled with the final
 ///                translation.  Use it to commit the drag and to
-///                reset your @State translation back to zero.
+///                reset any @State translation back to zero.
 struct UIKitDragGesture: UIViewRepresentable {
     var onTap: ((CGPoint) -> Void)? = nil
-    var onChanged: (CGFloat) -> Void
-    var onEnded: (CGFloat) -> Void
+    var onChanged: (CGPoint) -> Void
+    var onEnded: (CGPoint) -> Void
 
     func makeUIView(context: Context) -> UIView {
         let view = UIView()
@@ -82,12 +85,12 @@ struct UIKitDragGesture: UIViewRepresentable {
 
     final class Coordinator: NSObject {
         var onTap: ((CGPoint) -> Void)?
-        var onChanged: (CGFloat) -> Void
-        var onEnded: (CGFloat) -> Void
+        var onChanged: (CGPoint) -> Void
+        var onEnded: (CGPoint) -> Void
 
         init(onTap: ((CGPoint) -> Void)?,
-             onChanged: @escaping (CGFloat) -> Void,
-             onEnded: @escaping (CGFloat) -> Void) {
+             onChanged: @escaping (CGPoint) -> Void,
+             onEnded: @escaping (CGPoint) -> Void) {
             self.onTap = onTap
             self.onChanged = onChanged
             self.onEnded = onEnded
@@ -100,12 +103,12 @@ struct UIKitDragGesture: UIViewRepresentable {
         }
 
         @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
-            let tx = gesture.translation(in: gesture.view).x
+            let t = gesture.translation(in: gesture.view)
             switch gesture.state {
             case .began, .changed:
-                onChanged(tx)
+                onChanged(t)
             case .ended, .cancelled, .failed:
-                onEnded(tx)
+                onEnded(t)
             default:
                 break
             }
@@ -391,6 +394,17 @@ final class TrackRecorder: ObservableObject, Identifiable {
     /// undoable step is pushed (standard undo semantics).
     private var redoStack: [UndoEntry] = []
 
+    // MARK: Re-record archive hook
+
+    /// Fires from `beginFreshRecording()` BEFORE any state is
+    /// cleared.  `MainTimelineView` plugs in here to archive the
+    /// previous recording into a new snapshot-track on a different
+    /// row, so pressing Record a second time doesn't erase the
+    /// first take.  Kept as a plain closure (not a Combine
+    /// publisher) so it can mutate SwiftUI @State directly on the
+    /// MainActor.
+    var willBeginFreshRecording: (() -> Void)?
+
     // MARK: Transport intents
 
     /// Toggle recording. Turning on resets the track to 0. Turning
@@ -598,6 +612,62 @@ final class TrackRecorder: ObservableObject, Identifiable {
         refreshUndoRedo()
     }
 
+    /// Restore notes / duration / name / position from a snapshot
+    /// WITHOUT touching the undo or redo stacks — the caller is
+    /// expected to be inside an undo or redo closure that already
+    /// owns the history bookkeeping.
+    func restoreFromSnapshot(_ snap: TrackSnapshot,
+                             atStartSec startSec: TimeInterval,
+                             trackRow row: Int) {
+        notes            = snap.notes
+        recordedDuration = snap.duration
+        trackName        = snap.name
+        trackStartSec    = max(0, startSec)
+        trackRow         = row
+        isDeleted        = false
+        isSelected       = false
+    }
+
+    /// Wipe playback / recording / position state without touching
+    /// the undo or redo stacks.  Used by the re-record archive's
+    /// REDO closure to put the recorder back into "ready to record
+    /// fresh" shape after an undo restored it.
+    func clearForRerecord() {
+        releaseAllSoundingNotes()
+        stopTickerIfNeeded()
+        notes.removeAll()
+        openNoteIndex.removeAll()
+        previousActive.removeAll()
+        playbackStartedIds.removeAll()
+        playbackPlayingIds.removeAll()
+        recordedDuration = 0
+        trackStartSec    = 0
+        playheadSeconds  = 0
+        isSelected       = false
+        isRecording      = false
+        isPlayingBack    = false
+        isAdvancing      = false
+        isDeleted        = false
+    }
+
+    /// Drop every per-note entry from the undo and redo stacks
+    /// while preserving action entries.  Used by `MainTimelineView`
+    /// when archiving the current recording into a new snapshot-
+    /// track: those `.note` entries reference notes that are about
+    /// to be moved off this recorder, so leaving them in this
+    /// recorder's history would just produce confusing no-op undos.
+    func clearNoteHistory() {
+        undoStack.removeAll {
+            if case .note = $0 { return true }
+            return false
+        }
+        redoStack.removeAll {
+            if case .note = $0 { return true }
+            return false
+        }
+        refreshUndoRedo()
+    }
+
     private func stopTickerIfNeeded() {
         tickCancellable?.cancel()
         tickCancellable = nil
@@ -606,13 +676,21 @@ final class TrackRecorder: ObservableObject, Identifiable {
     // MARK: Lifecycle internals
 
     private func beginFreshRecording() {
+        // Let the parent archive the previous recording (if any)
+        // BEFORE we clear notes/duration/position.  Once this
+        // returns, the old data has either been copied into a
+        // snapshot-track or the parent explicitly chose not to
+        // preserve it (e.g. the track was already soft-deleted).
+        willBeginFreshRecording?()
+
         releaseAllSoundingNotes()
         playbackStartedIds.removeAll()
         notes.removeAll()
         openNoteIndex.removeAll()
         previousActive.removeAll()
-        undoStack.removeAll()
-        redoStack.removeAll()
+        // Undo and redo stacks are NOT cleared here — undo history
+        // persists across recording sessions per the user's spec.
+        // It only resets when they leave the recording page.
         recordedDuration = 0
         isSelected = false
         trackStartSec = 0
@@ -993,6 +1071,13 @@ struct TrackOverlay: View {
     /// this manually in the gesture's `onEnded`.
     @State private var dragMoveX: CGFloat = 0
 
+    /// Vertical drag offset.  Lets the user reposition a track
+    /// across rows by dragging up or down — on release we snap the
+    /// nearest row index into `recorder.trackRow`.  Independent of
+    /// `dragMoveX` so the user can move purely horizontally,
+    /// purely vertically, or diagonally.
+    @State private var dragMoveY: CGFloat = 0
+
     /// Resize-handle state.  Right-handle uses only `dragWidthDelta`.
     /// Left-handle uses both (offset shifts right, width shrinks by
     /// the same — so the right edge stays put).
@@ -1019,19 +1104,44 @@ struct TrackOverlay: View {
                                 recorder.toggleSelection()
                             }
                         },
-                        onChanged: { tx in
+                        onChanged: { translation in
                             guard recorder.isSelected else { return }
+                            // Horizontal: clamped so the track
+                            // can't slide past timeline 0.
                             let minDx = -CGFloat(recorder.trackStartSec)
                                 * pixelsPerSecond
-                            dragMoveX = max(minDx, tx)
+                            dragMoveX = max(minDx, translation.x)
+                            // Vertical: clamped so the track can't
+                            // ride up into the ruler area (row 0 is
+                            // the topmost valid lane).
+                            let minDy = -CGFloat(recorder.trackRow)
+                                * TrackView.stackedRowHeight
+                            dragMoveY = max(minDy, translation.y)
                         },
                         onEnded: { _ in
-                            defer { dragMoveX = 0 }
+                            defer {
+                                dragMoveX = 0
+                                dragMoveY = 0
+                            }
                             guard recorder.isSelected else { return }
+
+                            // Commit horizontal motion as a
+                            // trackStartSec delta.
                             let deltaSec = TimeInterval(
                                 dragMoveX / pixelsPerSecond)
                             recorder.setTrackStartSec(
                                 recorder.trackStartSec + deltaSec)
+
+                            // Commit vertical motion by snapping to
+                            // the nearest row.  Half-row threshold
+                            // so a small drag stays in the current
+                            // row; a half-row or more jumps lanes.
+                            let rowDelta = Int(
+                                (dragMoveY / TrackView.stackedRowHeight)
+                                    .rounded())
+                            let newRow = max(
+                                0, recorder.trackRow + rowDelta)
+                            recorder.trackRow = newRow
                         }
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1047,6 +1157,7 @@ struct TrackOverlay: View {
                        + dragLeftResizeX,
                     y: CGFloat(recorder.trackRow)
                        * TrackView.stackedRowHeight
+                       + dragMoveY
                 )
                 // Final defensive line: every transaction reaching
                 // this view gets its animation stripped.  The .offset
