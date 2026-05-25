@@ -23,35 +23,7 @@
 //  • The ruler/grid Canvas is an Equatable subview; it redraws only
 //    on zoom or scroll.
 //
-//  Drop this in: Views/Creation/
-//
 
-
-
-//
-//  MainTimelineView.swift
-//  Sensic
-//
-//  Workspace › Creation
-//  Main Timeline Area — Adaptive Ruler, Horizontal Zoom, Dynamic Grid,
-//  and a smooth draggable Playhead.
-//
-//  This component has NO background of its own.
-//
-//  Why dragging is smooth
-//  ----------------------
-//  • The playhead position lives in an @Observable model. Only the
-//    small `TLPlayheadLayer` child reads it, so a drag re-renders
-//    ONLY that child — the parent body, ScrollView and Canvas are
-//    never invalidated.
-//  • The playhead is rendered OUTSIDE the timeline's
-//    `.compositingGroup()`, so scrubbing never re-rasterizes the
-//    heavy composited timeline buffer.
-//  • The ruler/grid Canvas is an Equatable subview; it redraws only
-//    on zoom or scroll.
-//
-//  Drop this in: Views/Creation/
-//
 
 import SwiftUI
 
@@ -385,6 +357,42 @@ struct MainTimelineView: View {
     // invalidate this body.
     @State private var playhead = TLPlayheadModel()
 
+    // MARK: Edit-menu state
+
+    /// Tracks created by Paste actions.  Each is a self-contained
+    /// `TrackRecorder` populated from the clipboard snapshot — they
+    /// share no state with the primary recorder.
+    @State private var pastedTracks: [TrackRecorder] = []
+
+    /// What's on the clipboard (set by Copy, consumed by Paste).
+    @State private var clipboard: TrackSnapshot?
+
+    /// Drives the iOS edit-menu presentation.  Nil = no menu;
+    /// non-nil = present a menu with these contents at this point.
+    @State private var menuPresentation: MenuPresentation?
+
+    /// Which track the next Rename alert should write to.  Held
+    /// across the lifetime of the alert (which is dismissed by the
+    /// system once a button is tapped).
+    @State private var renameTarget: TrackRecorder?
+    @State private var renameText: String = ""
+    @State private var showRenameAlert: Bool = false
+
+    /// What the edit menu is currently targeting — either a
+    /// specific track (Copy/Paste/Delete/Rename apply to it) or
+    /// an empty point on the timeline (only Paste applies).
+    enum MenuTarget {
+        case track(TrackRecorder)
+        case emptySpace(trackStartSec: TimeInterval)
+    }
+
+    /// Bundles target + anchor point so a single `@State` controls
+    /// both whether the menu is up and where it appears.
+    struct MenuPresentation {
+        let target: MenuTarget
+        let sourcePoint: CGPoint
+    }
+
     private var metrics: TLMetrics {
         TLMetrics(pixelsPerBar: pixelsPerBar)
     }
@@ -412,10 +420,53 @@ struct MainTimelineView: View {
                              gridColor: gridColor)
                     .equatable()
 
-                TrackOverlay(recorder: recorder,
-                             pixelsPerSecond: pixelsPerSecond)
+                // Empty-space tap catcher.  Only present when
+                // there's something on the clipboard — otherwise
+                // there'd be nothing to paste, and we don't want
+                // to swallow taps that would scroll the canvas.
+                // Sits BELOW the track overlays so tracks still
+                // get first crack at their own taps.
+                if clipboard != nil {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .frame(maxWidth: .infinity,
+                               maxHeight: .infinity)
+                        .onTapGesture(coordinateSpace: .local) { loc in
+                            handleEmptySpaceTap(
+                                at: loc,
+                                pixelsPerSecond: pixelsPerSecond)
+                        }
+                }
+
+                // Primary recording track.
+                TrackOverlay(
+                    recorder: recorder,
+                    pixelsPerSecond: pixelsPerSecond,
+                    onRequestEditMenu: { loc, target in
+                        showEditMenu(
+                            at: loc,
+                            for: target,
+                            pixelsPerSecond: pixelsPerSecond)
+                    })
                     .offset(x: TLLayout.rulerLeadingInset,
                             y: TLLayout.topBarHeight + 2)
+
+                // Pasted tracks — each is rendered exactly like the
+                // primary, with its own selection / drag / edit-menu
+                // behavior.
+                ForEach(pastedTracks) { paste in
+                    TrackOverlay(
+                        recorder: paste,
+                        pixelsPerSecond: pixelsPerSecond,
+                        onRequestEditMenu: { loc, target in
+                            showEditMenu(
+                                at: loc,
+                                for: target,
+                                pixelsPerSecond: pixelsPerSecond)
+                        })
+                        .offset(x: TLLayout.rulerLeadingInset,
+                                y: TLLayout.topBarHeight + 2)
+                }
             }
         }
         .scrollPosition($scrollPosition)
@@ -429,6 +480,195 @@ struct MainTimelineView: View {
             viewportW = new.width
         }
         .simultaneousGesture(zoomGesture)
+        // Edit-menu host.  Sits OUTSIDE the ScrollView's content so
+        // its `sourcePoint` is in screen-stable coordinates that
+        // don't drift as the user scrolls.  Touches pass straight
+        // through it (`PassthroughHostView` returns nil from
+        // hitTest) so it doesn't interfere with anything below.
+        .overlay(alignment: .topLeading) {
+            EditMenuPresenter(
+                isPresented: Binding(
+                    get: { menuPresentation != nil },
+                    set: { if !$0 { menuPresentation = nil } }
+                ),
+                sourcePoint: menuPresentation?.sourcePoint ?? .zero,
+                actions: editMenuActions,
+                onAction: handleMenuAction
+            )
+            .frame(width: stripWidth,
+                   height: TLLayout.containerHeight)
+        }
+        // Rename alert.  Driven by `showRenameAlert` so the alert's
+        // own lifecycle can dismiss it without us having to mirror
+        // dismissal through any other state.
+        .alert("Rename Track", isPresented: $showRenameAlert) {
+            TextField("Track name", text: $renameText)
+            Button("Cancel", role: .cancel) {
+                renameTarget = nil
+            }
+            Button("Rename") {
+                renameTarget?.setTrackName(renameText)
+                renameTarget = nil
+            }
+        } message: {
+            Text("Enter a new name for this track.")
+        }
+        // Mirror the primary recorder's playback transport onto
+        // every pasted track.  Pasted recorders aren't owned by the
+        // parent, so they don't get .playTapped()/.stopTapped()
+        // calls from the transport bar — we proxy them here so all
+        // tracks on the timeline play and stop together.
+        .onReceive(recorder.$isPlayingBack) { isPlaying in
+            if isPlaying {
+                for track in pastedTracks where !track.isPlayingBack {
+                    track.playTapped()
+                }
+            } else {
+                for track in pastedTracks where track.isPlayingBack {
+                    track.stopTapped()
+                }
+            }
+        }
+    }
+
+    // MARK: Edit-menu plumbing
+
+    /// Actions for whatever the menu is currently targeting.  A
+    /// tapped track gets the full Copy/Paste/Edit/Delete/Rename
+    /// set; an empty-space tap gets just Paste.
+    private var editMenuActions: [EditMenuAction] {
+        guard let target = menuPresentation?.target else { return [] }
+        switch target {
+        case .track:
+            return [
+                EditMenuAction(id: "copy",   title: "Copy"),
+                EditMenuAction(id: "paste",  title: "Paste"),
+                EditMenuAction(id: "edit",   title: "Edit"),
+                EditMenuAction(id: "delete", title: "Delete",
+                               isDestructive: true),
+                EditMenuAction(id: "rename", title: "Rename"),
+            ]
+        case .emptySpace:
+            return [
+                EditMenuAction(id: "paste",  title: "Paste"),
+            ]
+        }
+    }
+
+    /// Convert a tap inside a TrackOverlay's local coordinate space
+    /// into the timeline's coordinate space, then to the screen-
+    /// stable space the EditMenuPresenter overlay lives in.
+    /// (Subtracting `scrollOffsetX` cancels out the scroll so the
+    /// menu sits over the finger no matter where in the timeline
+    /// the user tapped.)
+    private func showEditMenu(at trackLocalPoint: CGPoint,
+                              for target: TrackRecorder,
+                              pixelsPerSecond: CGFloat) {
+        let trackOffsetX = CGFloat(target.trackStartSec)
+            * pixelsPerSecond
+        let timelineX = TLLayout.rulerLeadingInset
+            + trackOffsetX + trackLocalPoint.x
+        let timelineY = TLLayout.topBarHeight + 2
+            + trackLocalPoint.y
+        let sourcePoint = CGPoint(
+            x: timelineX - scrollOffsetX,
+            y: timelineY)
+        menuPresentation = MenuPresentation(
+            target: .track(target),
+            sourcePoint: sourcePoint)
+    }
+
+    /// Handler for taps on empty timeline space — only invoked
+    /// when there's something on the clipboard, so the menu we
+    /// raise always offers Paste.
+    private func handleEmptySpaceTap(at scrollLocalPoint: CGPoint,
+                                     pixelsPerSecond: CGFloat) {
+        let timelineX = scrollLocalPoint.x - TLLayout.rulerLeadingInset
+        let trackStartSec = TimeInterval(
+            max(0, timelineX / pixelsPerSecond))
+        let sourcePoint = CGPoint(
+            x: scrollLocalPoint.x - scrollOffsetX,
+            y: scrollLocalPoint.y)
+        menuPresentation = MenuPresentation(
+            target: .emptySpace(trackStartSec: trackStartSec),
+            sourcePoint: sourcePoint)
+    }
+
+    /// Single entry point for every menu action.  Switches on the
+    /// (action-id, target) pair so each combo's logic is in one
+    /// readable place.  Always dismisses the menu at the end.
+    private func handleMenuAction(_ actionId: String) {
+        defer { menuPresentation = nil }
+        guard let presentation = menuPresentation else { return }
+
+        switch (actionId, presentation.target) {
+
+        case ("copy", .track(let recorder)):
+            clipboard = TrackSnapshot(
+                notes: recorder.notes,
+                duration: recorder.recordedDuration,
+                name: recorder.trackName)
+
+        case ("paste", let target):
+            guard let snap = clipboard else { return }
+            let startSec: TimeInterval
+            switch target {
+            case .track(let recorder):
+                // Pasting onto an existing track drops the copy
+                // immediately after that track.
+                startSec = recorder.trackStartSec
+                    + recorder.recordedDuration
+            case .emptySpace(let sec):
+                startSec = sec
+            }
+            let newTrack = TrackRecorder()
+            newTrack.loadSnapshot(snap, atStartSec: startSec)
+            // Share the primary recorder's audio destination so the
+            // copy actually makes sound during playback.  bind(to:)
+            // also sets up an activeNotes sink, but its handler
+            // guards on `isRecording`, so a non-recording pasted
+            // track will never capture stray key presses.
+            if let vm = recorder.audioOutput {
+                newTrack.bind(to: vm)
+            }
+            pastedTracks.append(newTrack)
+            // Register the paste with the primary's undo system so
+            // the undo button can reverse it.  We use softDelete
+            // (not array removal) so the same TrackRecorder
+            // instance stays around for redo.
+            recorder.pushUndoableAction(
+                TrackRecorder.UndoableAction(
+                    undo: { newTrack.deleteTrack() },
+                    redo: { newTrack.undelete()    }
+                )
+            )
+
+        case ("delete", .track(let track)):
+            // Soft-delete: the track's data survives so an undo can
+            // bring it back.  Routed through the primary's undo
+            // stack so the same button handles both note-level and
+            // track-level undo.
+            track.deleteTrack()
+            recorder.pushUndoableAction(
+                TrackRecorder.UndoableAction(
+                    undo: { track.undelete()    },
+                    redo: { track.deleteTrack() }
+                )
+            )
+
+        case ("rename", .track(let recorder)):
+            renameTarget    = recorder
+            renameText      = recorder.trackName
+            showRenameAlert = true
+
+        case ("edit", _):
+            // Intentionally a no-op for now — Edit is a placeholder
+            // until we know what it should open.
+            break
+
+        default:
+            break
+        }
     }
 
     private var zoomGesture: some Gesture {

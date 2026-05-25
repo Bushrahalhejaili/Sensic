@@ -33,7 +33,7 @@ import UIKit
 ///                translation.  Use it to commit the drag and to
 ///                reset your @State translation back to zero.
 struct UIKitDragGesture: UIViewRepresentable {
-    var onTap: (() -> Void)? = nil
+    var onTap: ((CGPoint) -> Void)? = nil
     var onChanged: (CGFloat) -> Void
     var onEnded: (CGFloat) -> Void
 
@@ -70,11 +70,11 @@ struct UIKitDragGesture: UIViewRepresentable {
     }
 
     final class Coordinator: NSObject {
-        var onTap: (() -> Void)?
+        var onTap: ((CGPoint) -> Void)?
         var onChanged: (CGFloat) -> Void
         var onEnded: (CGFloat) -> Void
 
-        init(onTap: (() -> Void)?,
+        init(onTap: ((CGPoint) -> Void)?,
              onChanged: @escaping (CGFloat) -> Void,
              onEnded: @escaping (CGFloat) -> Void) {
             self.onTap = onTap
@@ -83,8 +83,9 @@ struct UIKitDragGesture: UIViewRepresentable {
             super.init()
         }
 
-        @objc func handleTap(_: UITapGestureRecognizer) {
-            onTap?()
+        @objc func handleTap(_ gesture: UITapGestureRecognizer) {
+            let loc = gesture.location(in: gesture.view)
+            onTap?(loc)
         }
 
         @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
@@ -113,6 +114,133 @@ struct RecordedNote: Identifiable, Equatable {
     let velocity: UInt8
 }
 
+// MARK: - TrackSnapshot
+
+/// A pure-data copy of a track's musical content, used by the
+/// Copy/Paste workflow.  Lives independently of any TrackRecorder
+/// instance so we can hold it on the clipboard while the original
+/// keeps recording.
+struct TrackSnapshot {
+    let notes: [RecordedNote]
+    let duration: TimeInterval
+    let name: String
+}
+
+// MARK: - EditMenuAction
+
+/// One row in the iOS edit menu.  Maps to a `UIAction` inside the
+/// `UIMenu` we hand to `UIEditMenuInteraction`.
+struct EditMenuAction {
+    let id: String
+    let title: String
+    var isDestructive: Bool = false
+}
+
+// MARK: - EditMenuPresenter
+
+/// SwiftUI wrapper around `UIEditMenuInteraction` (iOS 16+), the
+/// system's native edit-menu API.  Produces the glass pill with
+/// separators and the red-on-destructive treatment that the
+/// reference screenshot shows — the look is OS-supplied, we just
+/// provide the actions.
+///
+/// Drive it with two bindings on the parent view:
+///   - `isPresented`: writes `true` to show the menu, `false` to
+///     dismiss it.  The wrapper writes `false` back when the user
+///     taps outside or picks an action.
+///   - `sourcePoint`: where the menu should anchor, in this
+///     wrapper's local coordinate space.  Apple positions the menu
+///     just above this point (flipping below if it would clip).
+struct EditMenuPresenter: UIViewRepresentable {
+    @Binding var isPresented: Bool
+    let sourcePoint: CGPoint
+    let actions: [EditMenuAction]
+    let onAction: (String) -> Void
+
+    func makeUIView(context: Context) -> UIView {
+        let view = PassthroughHostView()
+        view.backgroundColor = .clear
+        let interaction = UIEditMenuInteraction(
+            delegate: context.coordinator)
+        view.addInteraction(interaction)
+        context.coordinator.interaction = interaction
+        context.coordinator.parent = self
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.actions  = actions
+        context.coordinator.onAction = onAction
+        context.coordinator.parent   = self
+
+        if isPresented {
+            if context.coordinator.currentConfig == nil {
+                let config = UIEditMenuConfiguration(
+                    identifier: "track_edit_menu" as NSString,
+                    sourcePoint: sourcePoint)
+                context.coordinator.currentConfig = config
+                context.coordinator.interaction?
+                    .presentEditMenu(with: config)
+            }
+        } else {
+            if context.coordinator.currentConfig != nil {
+                context.coordinator.interaction?.dismissMenu()
+                context.coordinator.currentConfig = nil
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator: NSObject, UIEditMenuInteractionDelegate {
+        weak var interaction: UIEditMenuInteraction?
+        var actions: [EditMenuAction] = []
+        var onAction: ((String) -> Void)?
+        var currentConfig: UIEditMenuConfiguration?
+        var parent: EditMenuPresenter?
+
+        func editMenuInteraction(
+            _ interaction: UIEditMenuInteraction,
+            menuFor configuration: UIEditMenuConfiguration,
+            suggestedActions: [UIMenuElement]
+        ) -> UIMenu? {
+            let items = actions.map { item -> UIAction in
+                let a = UIAction(title: item.title) { [weak self] _ in
+                    self?.onAction?(item.id)
+                }
+                if item.isDestructive { a.attributes = .destructive }
+                return a
+            }
+            // .displayInline lays the actions out in one row inside
+            // the glass pill — matches the reference screenshot.
+            return UIMenu(title: "",
+                          options: .displayInline,
+                          children: items)
+        }
+
+        func editMenuInteraction(
+            _ interaction: UIEditMenuInteraction,
+            willDismissMenuFor configuration: UIEditMenuConfiguration,
+            animator: UIEditMenuInteractionAnimating
+        ) {
+            // Sync state back to SwiftUI after the dismissal animates.
+            DispatchQueue.main.async { [weak self] in
+                self?.parent?.isPresented = false
+                self?.currentConfig = nil
+            }
+        }
+    }
+}
+
+/// Lets touches fall through to underlying views; the menu is
+/// presented programmatically, so this host doesn't need to
+/// intercept anything.
+private final class PassthroughHostView: UIView {
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        nil
+    }
+}
+
 // MARK: - TrackRecorder
 
 /// Source of truth for the recording session.
@@ -132,7 +260,11 @@ struct RecordedNote: Identifiable, Equatable {
 /// Bind a piano `RecordViewModel` with `bind(to:)`; key presses that
 /// happen while `isRecording == true` become `RecordedNote` entries.
 @MainActor
-final class TrackRecorder: ObservableObject {
+final class TrackRecorder: ObservableObject, Identifiable {
+
+    /// Object-identity ID — lets `ForEach` iterate over an array of
+    /// TrackRecorders without needing any extra wrapper.
+    nonisolated var id: ObjectIdentifier { ObjectIdentifier(self) }
 
     // MARK: Observed output
 
@@ -152,6 +284,12 @@ final class TrackRecorder: ObservableObject {
     /// editing frame (white border + drag handles).
     @Published var isSelected: Bool = false
 
+    /// Display name shown in the track's header.  Defaults to
+    /// "Piano"; the user can change it via the edit menu's
+    /// Rename action.  Per-track — renaming one track doesn't
+    /// touch any others.
+    @Published var trackName: String = "Piano"
+
     /// Position of the track's left edge on the timeline, in
     /// seconds.  0 = aligned with the start of the timeline; a
     /// positive value moves the whole track (and its notes) to the
@@ -159,12 +297,19 @@ final class TrackRecorder: ObservableObject {
     /// resize handle.
     @Published var trackStartSec: TimeInterval = 0
 
-    /// True when there's something to undo (`notes` is non-empty
-    /// and we're not currently recording).
+    /// Soft-deleted state.  When `true`, `TrackOverlay` renders
+    /// `EmptyView()` for this recorder — the track disappears from
+    /// the timeline but its notes, name, position, and undo
+    /// history are all preserved so a delete can be undone.
+    @Published var isDeleted: Bool = false
+
+    /// True when there's something to undo (the undo stack has at
+    /// least one entry — note or action — and we're not currently
+    /// recording).
     @Published private(set) var canUndo: Bool = false
 
     /// True when there's something to redo (the redo stack has at
-    /// least one note and we're not currently recording).
+    /// least one entry and we're not currently recording).
     @Published private(set) var canRedo: Bool = false
 
     /// Tempo used to convert real-time seconds → musical beats so
@@ -178,6 +323,12 @@ final class TrackRecorder: ObservableObject {
     private var tickCancellable: AnyCancellable?
 
     private weak var pianoVM: RecordViewModel?
+
+    /// Read-only handle to the audio destination this recorder is
+    /// bound to.  Used so pasted copies can share the original
+    /// recorder's piano/synth output — without it, a pasted track
+    /// has no `pianoVM` set and its playback tick is a no-op.
+    var audioOutput: RecordViewModel? { pianoVM }
     private var pianoCancellable: AnyCancellable?
     private var previousActive: Set<UInt8> = []
     private var openNoteIndex: [UInt8: Int] = [:]
@@ -191,10 +342,36 @@ final class TrackRecorder: ObservableObject {
     /// stop or re-record.
     private var playbackPlayingIds: Set<UUID> = []
 
-    /// Notes that have been undone — popped from `notes`, kept here
-    /// so they can be restored by `redoTapped()`.  Cleared whenever
-    /// a fresh recording begins.
-    private var redoStack: [RecordedNote] = []
+    // MARK: Undo / redo
+
+    /// One reversible step in the unified history.  A `.note` entry
+    /// is a single recorded note that can be popped from the notes
+    /// array on undo and re-appended on redo.  An `.action` entry
+    /// is an arbitrary closure pair pushed from outside the
+    /// recorder — used by `MainTimelineView` so track-level edits
+    /// (delete, paste) flow through the same undo button.
+    enum UndoEntry {
+        case note(RecordedNote)
+        case action(UndoableAction)
+    }
+
+    /// A track-level operation, wrapped so the recorder can store
+    /// it in its undo history without knowing what it does.  The
+    /// pusher supplies the do/redo and undo closures; the recorder
+    /// just invokes them at the right time.
+    struct UndoableAction {
+        let undo: () -> Void
+        let redo: () -> Void
+    }
+
+    /// Most-recent-first history.  Push on note completion and on
+    /// any `pushUndoableAction(_:)` call.  Popped by `undoTapped`.
+    private var undoStack: [UndoEntry] = []
+
+    /// Entries that have been undone — popped from `undoStack`,
+    /// kept here so they can be redone.  Cleared when any new
+    /// undoable step is pushed (standard undo semantics).
+    private var redoStack: [UndoEntry] = []
 
     // MARK: Transport intents
 
@@ -256,29 +433,65 @@ final class TrackRecorder: ObservableObject {
         seekPlayhead(to: playheadSeconds + 10)
     }
 
-    /// Remove the most recently recorded note from the track and
-    /// push it to the redo stack.  No-op during active recording.
-    /// If the note is currently sounding (mid-playback), it's
-    /// released so it doesn't keep ringing after disappearing
-    /// visually.
+    /// Reverse the most-recent recorded note or track-level action.
+    /// No-op during active recording.  For a note entry: locates
+    /// the matching note in the current `notes` array by id,
+    /// removes it, and stops any sustained playback for it.  For
+    /// an action entry: simply invokes the supplied `undo` closure.
+    /// Either way the entry moves to `redoStack` so the next
+    /// `redoTapped()` can put it back.
     func undoTapped() {
-        guard !isRecording, let last = notes.popLast() else { return }
-        if playbackPlayingIds.contains(last.id) {
-            pianoVM?.noteOff(midi: last.midi)
-            playbackPlayingIds.remove(last.id)
+        guard !isRecording, let entry = undoStack.popLast() else { return }
+        switch entry {
+        case .note(let stale):
+            // The note's endSeconds may have been set after we
+            // captured it — look up the current copy by id so the
+            // redo restores the up-to-date version.
+            if let idx = notes.firstIndex(where: { $0.id == stale.id }) {
+                let current = notes.remove(at: idx)
+                if playbackPlayingIds.contains(current.id) {
+                    pianoVM?.noteOff(midi: current.midi)
+                    playbackPlayingIds.remove(current.id)
+                }
+                playbackStartedIds.remove(current.id)
+                redoStack.append(.note(current))
+            } else {
+                // The note isn't in the array anymore — push the
+                // stale value to redo so the redo can still work.
+                redoStack.append(.note(stale))
+            }
+
+        case .action(let action):
+            action.undo()
+            redoStack.append(.action(action))
         }
-        playbackStartedIds.remove(last.id)
-        redoStack.append(last)
         refreshUndoRedo()
     }
 
-    /// Re-append the most recently undone note to the track.
-    /// No-op during active recording or when the redo stack is
-    /// empty.  Mid-playback redos won't sound until the next
-    /// playback session.
+    /// Re-apply the most-recently-undone step.  No-op during active
+    /// recording or when the redo stack is empty.  Mid-playback
+    /// redos of notes won't sound until the next playback session.
     func redoTapped() {
-        guard !isRecording, let next = redoStack.popLast() else { return }
-        notes.append(next)
+        guard !isRecording, let entry = redoStack.popLast() else { return }
+        switch entry {
+        case .note(let n):
+            notes.append(n)
+            undoStack.append(.note(n))
+        case .action(let action):
+            action.redo()
+            undoStack.append(.action(action))
+        }
+        refreshUndoRedo()
+    }
+
+    /// Add a reversible track-level operation to the undo history.
+    /// Called by `MainTimelineView` for paste and delete so those
+    /// actions can be undone with the same button that handles
+    /// per-note undo.  Clears the redo stack — any new action
+    /// invalidates the previous redo chain.
+    func pushUndoableAction(_ action: UndoableAction) {
+        undoStack.append(.action(action))
+        redoStack.removeAll()
         refreshUndoRedo()
     }
 
@@ -306,6 +519,72 @@ final class TrackRecorder: ObservableObject {
         recordedDuration = max(0.5, sec)
     }
 
+    /// Rename the track.  Empty/whitespace-only input falls back to
+    /// "Piano" rather than producing a blank header.  Called by the
+    /// edit menu's Rename action.
+    func setTrackName(_ name: String) {
+        let trimmed = name.trimmingCharacters(
+            in: .whitespacesAndNewlines)
+        trackName = trimmed.isEmpty ? "Piano" : trimmed
+    }
+
+    /// "Delete" the track.  This is a SOFT delete: the visual is
+    /// hidden (`TrackOverlay` checks `isDeleted` and renders
+    /// `EmptyView()`) but the recorder's notes, duration, position,
+    /// name, and undo history are all preserved.  That way a
+    /// follow-up `undelete()` (driven by an undo) brings the track
+    /// back exactly as it was.
+    ///
+    /// Sustained notes are released and the playhead ticker is
+    /// stopped so the now-invisible track makes no further sound.
+    func deleteTrack() {
+        guard !isDeleted else { return }
+        releaseAllSoundingNotes()
+        stopTickerIfNeeded()
+        isDeleted     = true
+        isPlayingBack = false
+        isAdvancing   = false
+        isSelected    = false
+    }
+
+    /// Reverse of `deleteTrack()` — the track becomes visible
+    /// again with its preserved data.  Called by the undo action
+    /// pushed in `MainTimelineView` when the user undoes a delete.
+    func undelete() {
+        isDeleted = false
+    }
+
+    /// Populate this (fresh) recorder from a clipboard snapshot.
+    /// Used when a paste action creates a new track copy of an
+    /// existing one.  Pasted recorders aren't bound to the piano
+    /// VM at construction; the caller is expected to call `bind(to:)`
+    /// after this if they want audio output.
+    func loadSnapshot(_ snap: TrackSnapshot,
+                      atStartSec startSec: TimeInterval) {
+        notes            = snap.notes
+        recordedDuration = snap.duration
+        trackName        = snap.name
+        trackStartSec    = max(0, startSec)
+        isSelected       = false
+        isRecording      = false
+        isPlayingBack    = false
+        isAdvancing      = false
+        isDeleted        = false
+        playheadSeconds  = 0
+        // Pasted tracks start without their own undo history.  The
+        // primary recorder's undo button is the only one wired in
+        // the UI, and the paste itself is pushed there as a single
+        // `.action` entry by `MainTimelineView`.
+        undoStack.removeAll()
+        redoStack.removeAll()
+        refreshUndoRedo()
+    }
+
+    private func stopTickerIfNeeded() {
+        tickCancellable?.cancel()
+        tickCancellable = nil
+    }
+
     // MARK: Lifecycle internals
 
     private func beginFreshRecording() {
@@ -314,10 +593,15 @@ final class TrackRecorder: ObservableObject {
         notes.removeAll()
         openNoteIndex.removeAll()
         previousActive.removeAll()
+        undoStack.removeAll()
         redoStack.removeAll()
         recordedDuration = 0
         isSelected = false
         trackStartSec = 0
+        // A fresh recording on a previously-deleted track makes the
+        // track visible again — recording into nothing wouldn't
+        // make sense.
+        isDeleted = false
         rewindPlayhead()
         isRecording = true
         isPlayingBack = false
@@ -444,7 +728,7 @@ final class TrackRecorder: ObservableObject {
     /// Recompute `canUndo` / `canRedo` from the current state.
     /// Called from every transport intent so the UI stays in sync.
     private func refreshUndoRedo() {
-        canUndo = !notes.isEmpty   && !isRecording
+        canUndo = !undoStack.isEmpty && !isRecording
         canRedo = !redoStack.isEmpty && !isRecording
     }
 
@@ -457,13 +741,21 @@ final class TrackRecorder: ObservableObject {
     }
 
     private func openNote(midi: UInt8, at time: TimeInterval, velocity: UInt8) {
-        notes.append(RecordedNote(
+        let n = RecordedNote(
             midi: midi,
             startSeconds: time,
             endSeconds: nil,
             velocity: velocity
-        ))
+        )
+        notes.append(n)
         openNoteIndex[midi] = notes.count - 1
+        // Add to history at open time so the undo order matches
+        // the existing pop-LIFO behavior (most-recent-started
+        // first).  `undoTapped` re-reads the note from `notes` by
+        // id, so the value captured here being incomplete is fine.
+        undoStack.append(.note(n))
+        redoStack.removeAll()
+        refreshUndoRedo()
     }
 
     private func closeNote(midi: UInt8, at time: TimeInterval) {
@@ -524,6 +816,11 @@ struct TrackView: View {
     /// timeline's zoom level so the track stretches and shrinks
     /// in lockstep with the ruler.
     let pixelsPerSecond: CGFloat
+
+    /// Name shown in the track's 14pt header strip.  Driven by
+    /// `TrackRecorder.trackName` — the user can change it from the
+    /// edit menu's Rename action.
+    let trackName: String
 
     // MARK: Geometry
 
@@ -591,9 +888,11 @@ struct TrackView: View {
                         .foregroundStyle(.white)
                         .padding(.vertical, Self.iconVerticalInset)
 
-                    Text("Piano")
+                    Text(trackName)
                         .font(.system(size: Self.labelSize, weight: .regular))
                         .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
                 .padding(.leading, Self.iconLeadingInset)
             }
@@ -655,6 +954,13 @@ struct TrackOverlay: View {
     /// pixelsPerBeat and the recorder's bpm.
     let pixelsPerSecond: CGFloat
 
+    /// Fired when the user taps a track that's already selected.
+    /// First arg is the tap point in the track's local coordinate
+    /// space; second arg is the recorder that was tapped.  The
+    /// parent (`MainTimelineView`) converts the point to its own
+    /// space and presents the iOS edit menu there.
+    var onRequestEditMenu: (CGPoint, TrackRecorder) -> Void
+
     /// Live offset from the body's drag.  Plain `@State` because
     /// the move gesture is now a UIKit `UIPanGestureRecognizer`
     /// (via `UIKitDragGesture`) — UIKit recognizers don't have an
@@ -669,7 +975,8 @@ struct TrackOverlay: View {
     @State private var dragLeftResizeX: CGFloat = 0
 
     var body: some View {
-        if recorder.isRecording || recorder.recordedDuration > 0 {
+        if !recorder.isDeleted
+            && (recorder.isRecording || recorder.recordedDuration > 0) {
             trackContent
                 // UIKit pan + tap recognizer overlay.  Sits BELOW
                 // the selection frame overlay so the white resize
@@ -677,7 +984,16 @@ struct TrackOverlay: View {
                 // their hit-testing priority.
                 .overlay {
                     UIKitDragGesture(
-                        onTap: { recorder.toggleSelection() },
+                        onTap: { location in
+                            // First tap selects; a subsequent tap
+                            // on an already-selected track raises
+                            // the edit menu instead.
+                            if recorder.isSelected {
+                                onRequestEditMenu(location, recorder)
+                            } else {
+                                recorder.toggleSelection()
+                            }
+                        },
                         onChanged: { tx in
                             guard recorder.isSelected else { return }
                             let minDx = -CGFloat(recorder.trackStartSec)
@@ -737,7 +1053,8 @@ struct TrackOverlay: View {
             notes: recorder.notes,
             durationSeconds: effectiveDuration,
             playheadSeconds: recorder.playheadSeconds,
-            pixelsPerSecond: pixelsPerSecond
+            pixelsPerSecond: pixelsPerSecond,
+            trackName: recorder.trackName
         )
         .contentShape(Rectangle())
     }
@@ -853,7 +1170,8 @@ struct TrackOverlay: View {
                 ],
                 durationSeconds: 4,
                 playheadSeconds: 4,
-                pixelsPerSecond: 80
+                pixelsPerSecond: 80,
+                trackName: "Piano"
             )
         }
         .padding()
