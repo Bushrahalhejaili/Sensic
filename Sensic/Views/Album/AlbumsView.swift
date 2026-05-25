@@ -8,12 +8,11 @@ import SwiftUI
 import Observation
 
 struct AlbumsView: View {
-    
+    @Environment(\.dismiss) private var dismiss
     @State private var vm = AlbumsViewModel()
     
     var body: some View {
         
-        NavigationStack {
             ZStack {
                 
                 Color.black
@@ -49,7 +48,6 @@ struct AlbumsView: View {
             .animation(.easeInOut(duration: 0.2), value: vm.showCreateAlbum)
         }
     }
-}
 
 // MARK: - Sections
 
@@ -60,6 +58,8 @@ extension AlbumsView {
         HStack {
 
             Button {
+
+                dismiss()
 
             } label: {
 
