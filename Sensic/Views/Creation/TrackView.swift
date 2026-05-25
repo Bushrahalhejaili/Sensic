@@ -14,6 +14,92 @@
 
 import SwiftUI
 import Combine
+import UIKit
+
+// MARK: - UIKitDragGesture
+
+/// A UIKit pan (and optional tap) gesture wrapped as a SwiftUI
+/// view.  Use as an `.overlay { }` to capture touches on the area
+/// it covers.  We use this instead of SwiftUI's `DragGesture` when
+/// the latter feels laggy — UIKit gesture recognizers deliver
+/// touch events directly to the run loop, so they aren't subject
+/// to SwiftUI's gesture/transaction interpolation.
+///
+/// - `onTap`:     fires on a quick tap that doesn't move.  Omit
+///                (pass `nil`) on views that should only pan.
+/// - `onChanged`: fires repeatedly during the pan with the
+///                cumulative x-axis translation since touch start.
+/// - `onEnded`:   fires once at .ended/.cancelled with the final
+///                translation.  Use it to commit the drag and to
+///                reset your @State translation back to zero.
+struct UIKitDragGesture: UIViewRepresentable {
+    var onTap: (() -> Void)? = nil
+    var onChanged: (CGFloat) -> Void
+    var onEnded: (CGFloat) -> Void
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+        view.isUserInteractionEnabled = true
+
+        let pan = UIPanGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.handlePan(_:)))
+        pan.maximumNumberOfTouches = 1
+        view.addGestureRecognizer(pan)
+
+        if onTap != nil {
+            let tap = UITapGestureRecognizer(
+                target: context.coordinator,
+                action: #selector(Coordinator.handleTap(_:)))
+            view.addGestureRecognizer(tap)
+        }
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.onTap     = onTap
+        context.coordinator.onChanged = onChanged
+        context.coordinator.onEnded   = onEnded
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onTap: onTap,
+                    onChanged: onChanged,
+                    onEnded: onEnded)
+    }
+
+    final class Coordinator: NSObject {
+        var onTap: (() -> Void)?
+        var onChanged: (CGFloat) -> Void
+        var onEnded: (CGFloat) -> Void
+
+        init(onTap: (() -> Void)?,
+             onChanged: @escaping (CGFloat) -> Void,
+             onEnded: @escaping (CGFloat) -> Void) {
+            self.onTap = onTap
+            self.onChanged = onChanged
+            self.onEnded = onEnded
+            super.init()
+        }
+
+        @objc func handleTap(_: UITapGestureRecognizer) {
+            onTap?()
+        }
+
+        @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
+            let tx = gesture.translation(in: gesture.view).x
+            switch gesture.state {
+            case .began, .changed:
+                onChanged(tx)
+            case .ended, .cancelled, .failed:
+                onEnded(tx)
+            default:
+                break
+            }
+        }
+    }
+}
 
 // MARK: - RecordedNote
 
@@ -569,15 +655,12 @@ struct TrackOverlay: View {
     /// pixelsPerBeat and the recorder's bpm.
     let pixelsPerSecond: CGFloat
 
-    /// Live offset from the body's drag.  Uses `@GestureState` (not
-    /// `@State`) for two reasons that matter on iOS 26: the
-    /// `.updating` closure lets us explicitly null out animations in
-    /// the gesture's `Transaction` — which is the only knob that
-    /// reliably stops SwiftUI from springing the offset between
-    /// frames — and the value auto-resets to 0 when the gesture ends,
-    /// in the same render tick as the recorder commit, so there's no
-    /// visual jump.
-    @GestureState private var dragMoveX: CGFloat = 0
+    /// Live offset from the body's drag.  Plain `@State` because
+    /// the move gesture is now a UIKit `UIPanGestureRecognizer`
+    /// (via `UIKitDragGesture`) — UIKit recognizers don't have an
+    /// auto-resetting equivalent of `@GestureState`, so we reset
+    /// this manually in the gesture's `onEnded`.
+    @State private var dragMoveX: CGFloat = 0
 
     /// Resize-handle state.  Right-handle uses only `dragWidthDelta`.
     /// Left-handle uses both (offset shifts right, width shrinks by
@@ -588,6 +671,30 @@ struct TrackOverlay: View {
     var body: some View {
         if recorder.isRecording || recorder.recordedDuration > 0 {
             trackContent
+                // UIKit pan + tap recognizer overlay.  Sits BELOW
+                // the selection frame overlay so the white resize
+                // handles (still SwiftUI gestures, for now) keep
+                // their hit-testing priority.
+                .overlay {
+                    UIKitDragGesture(
+                        onTap: { recorder.toggleSelection() },
+                        onChanged: { tx in
+                            guard recorder.isSelected else { return }
+                            let minDx = -CGFloat(recorder.trackStartSec)
+                                * pixelsPerSecond
+                            dragMoveX = max(minDx, tx)
+                        },
+                        onEnded: { _ in
+                            defer { dragMoveX = 0 }
+                            guard recorder.isSelected else { return }
+                            let deltaSec = TimeInterval(
+                                dragMoveX / pixelsPerSecond)
+                            recorder.setTrackStartSec(
+                                recorder.trackStartSec + deltaSec)
+                        }
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
                 .overlay {
                     if recorder.isSelected {
                         selectionFrame
@@ -596,6 +703,16 @@ struct TrackOverlay: View {
                 .offset(x: CGFloat(recorder.trackStartSec) * pixelsPerSecond
                            + dragMoveX
                            + dragLeftResizeX)
+                // Final defensive line: every transaction reaching
+                // this view gets its animation stripped.  The .offset
+                // value can change between renders for many reasons
+                // (gesture state, recorder commits, scroll) and we
+                // want the position to snap to each new value
+                // instantly — never interpolate.
+                .transaction { transaction in
+                    transaction.animation = nil
+                    transaction.disablesAnimations = true
+                }
         } else {
             EmptyView()
         }
@@ -610,15 +727,11 @@ struct TrackOverlay: View {
                 + TimeInterval(dragWidthDelta / pixelsPerSecond))
     }
 
-    // MARK: Track + tap-or-move gesture
+    // MARK: Track content
 
-    /// The track visual, with a unified tap-or-move gesture.  Tap
-    /// (no movement) toggles selection; movement (when already
-    /// selected) drags the track on the timeline.  Combining them
-    /// into one `DragGesture(minimumDistance: 0)` is what lets the
-    /// drag activate instantly — separate tap + drag gestures
-    /// forced a `minimumDistance` of at least 1, which is what felt
-    /// like a "lock" on the first 1pt of motion.
+    /// The track visual.  Hit-testing comes from the
+    /// `UIKitDragGesture` overlay set up in `body`, not from a
+    /// SwiftUI gesture on this view.
     private var trackContent: some View {
         TrackView(
             notes: recorder.notes,
@@ -627,46 +740,6 @@ struct TrackOverlay: View {
             pixelsPerSecond: pixelsPerSecond
         )
         .contentShape(Rectangle())
-        .highPriorityGesture(tapOrMoveGesture)
-    }
-
-    private var tapOrMoveGesture: some Gesture {
-        DragGesture(minimumDistance: 0)
-            .updating($dragMoveX) { value, state, transaction in
-                // Kill any inherited animation — without this iOS 26
-                // tries to interpolate the offset between frames,
-                // which is the "lag/slow" feel.
-                transaction.animation = nil
-                transaction.disablesAnimations = true
-
-                guard recorder.isSelected else {
-                    state = 0   // only selected tracks move visually
-                    return
-                }
-                let minDx = -CGFloat(recorder.trackStartSec)
-                    * pixelsPerSecond
-                state = max(minDx, value.translation.width)
-            }
-            .onEnded { value in
-                let dx = value.translation.width
-
-                // Treat a near-zero drag as a tap: toggle selection.
-                if abs(dx) < 3 {
-                    recorder.toggleSelection()
-                    return
-                }
-
-                guard recorder.isSelected else { return }
-
-                let minDx = -CGFloat(recorder.trackStartSec)
-                    * pixelsPerSecond
-                let clamped = max(minDx, dx)
-                let deltaSec = TimeInterval(clamped / pixelsPerSecond)
-                recorder.setTrackStartSec(
-                    recorder.trackStartSec + deltaSec)
-                // dragMoveX auto-resets via @GestureState in the
-                // same render tick — no visual jump.
-            }
     }
 
     // MARK: Selection frame + edge handles

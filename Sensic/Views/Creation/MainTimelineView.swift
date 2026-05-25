@@ -28,6 +28,31 @@
 
 
 
+//
+//  MainTimelineView.swift
+//  Sensic
+//
+//  Workspace › Creation
+//  Main Timeline Area — Adaptive Ruler, Horizontal Zoom, Dynamic Grid,
+//  and a smooth draggable Playhead.
+//
+//  This component has NO background of its own.
+//
+//  Why dragging is smooth
+//  ----------------------
+//  • The playhead position lives in an @Observable model. Only the
+//    small `TLPlayheadLayer` child reads it, so a drag re-renders
+//    ONLY that child — the parent body, ScrollView and Canvas are
+//    never invalidated.
+//  • The playhead is rendered OUTSIDE the timeline's
+//    `.compositingGroup()`, so scrubbing never re-rasterizes the
+//    heavy composited timeline buffer.
+//  • The ruler/grid Canvas is an Equatable subview; it redraws only
+//    on zoom or scroll.
+//
+//  Drop this in: Views/Creation/
+//
+
 import SwiftUI
 
 // MARK: - Layout constants
@@ -251,27 +276,24 @@ private struct TLPlayheadLayer: View {
     let lineColor: Color
     let fillColor: Color
 
-    @State private var dragStartBeat: Double?
-
-    private var drag: some Gesture {
-        DragGesture(minimumDistance: 0)
-            .onChanged { value in
-                if dragStartBeat == nil { dragStartBeat = model.beat }
-                let step = metrics.scale.tickStepBeats
-                let delta = Double(
-                    value.translation.width / metrics.pixelsPerBeat)
-                let raw = (dragStartBeat ?? model.beat) + delta
-                let snapped = (raw / step).rounded() * step
-                model.beat = min(max(0, snapped), metrics.totalBeats)
-            }
-            .onEnded { _ in dragStartBeat = nil }
-    }
+    /// Live beat delta during a drag.  Plain `@State` because the
+    /// drag is now a UIKit `UIPanGestureRecognizer` (via
+    /// `UIKitDragGesture`) — UIKit recognizers have no
+    /// auto-resetting equivalent of `@GestureState`, so we reset
+    /// this manually in the gesture's `onEnded`.  We still never
+    /// write `model.beat` mid-drag; only on `onEnded`, so the
+    /// @Observable model doesn't broadcast at 60Hz.
+    @State private var dragBeatDelta: Double = 0
 
     var body: some View {
         let handleW = TLLayout.playheadHandleWidth
         let handleH = TLLayout.playheadHandleHeight
         let pad     = TLLayout.playheadHitPadding
-        let screenX = metrics.x(forBeat: model.beat) - scrollOffsetX
+        // Visual position = committed beat + live drag delta.  During
+        // drag, model.beat is stable and only `dragBeatDelta` moves,
+        // which is what keeps the playhead pixel-locked to the finger.
+        let visualBeat = model.beat + dragBeatDelta
+        let screenX = metrics.x(forBeat: visualBeat) - scrollOffsetX
 
         return ZStack(alignment: .topLeading) {
             ZStack(alignment: .top) {
@@ -291,7 +313,29 @@ private struct TLPlayheadLayer: View {
                     .frame(width: handleW, height: handleH)
                     .padding(pad)
                     .contentShape(Rectangle())
-                    .highPriorityGesture(drag)
+                    .overlay {
+                        UIKitDragGesture(
+                            onChanged: { tx in
+                                let rawDelta = Double(
+                                    tx / metrics.pixelsPerBeat)
+                                let target = model.beat + rawDelta
+                                let clamped = min(
+                                    max(0, target),
+                                    metrics.totalBeats)
+                                dragBeatDelta = clamped - model.beat
+                            },
+                            onEnded: { tx in
+                                let rawDelta = Double(
+                                    tx / metrics.pixelsPerBeat)
+                                let target = model.beat + rawDelta
+                                model.beat = min(
+                                    max(0, target),
+                                    metrics.totalBeats)
+                                dragBeatDelta = 0
+                            }
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                     .offset(y: TLLayout.topBarHeight - handleH - pad)
             }
             .frame(width: handleW,
@@ -303,6 +347,14 @@ private struct TLPlayheadLayer: View {
                height: TLLayout.containerHeight,
                alignment: .topLeading)
         .clipped()
+        // Strip animation from every transaction reaching this
+        // layer.  Same reason as TrackOverlay — the .offset that
+        // positions the playhead must snap to each gesture tick,
+        // never interpolate.
+        .transaction { transaction in
+            transaction.animation = nil
+            transaction.disablesAnimations = true
+        }
     }
 }
 
@@ -425,15 +477,11 @@ struct MainTimelineView: View {
                            height: TLLayout.innerStripHeight)
                     .frame(width: TLLayout.containerWidth,
                            alignment: .topTrailing)
-                    .animation(.easeOut(duration: 0.2),
-                               value: stripWidth)
 
                 scrollableGrid
                     .frame(width: TLLayout.containerWidth,
                            height: TLLayout.containerHeight,
                            alignment: .topTrailing)
-                    .animation(.easeOut(duration: 0.2),
-                               value: stripWidth)
             }
             .frame(width: TLLayout.containerWidth,
                    height: TLLayout.containerHeight)
@@ -453,7 +501,6 @@ struct MainTimelineView: View {
                        alignment: .topTrailing)
                 .clipShape(RoundedRectangle(
                     cornerRadius: TLLayout.containerRadius))
-                .animation(.easeOut(duration: 0.2), value: stripWidth)
         }
         .frame(width: TLLayout.containerWidth,
                height: TLLayout.containerHeight)
