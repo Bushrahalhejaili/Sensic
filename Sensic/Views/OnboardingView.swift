@@ -165,7 +165,7 @@ struct OnboardingView: View {
                             .cornerRadius(33)
                     }
                     .padding(.horizontal, 36)
-                    .padding(.bottom, 42)
+                    .padding(.bottom, 50)
                 }
             }
         }

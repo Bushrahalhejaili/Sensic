@@ -31,6 +31,34 @@ struct Onb3: View {
                     
                     Spacer()
                     
+                    // Title
+                    VStack(spacing: -2) {
+                        
+                        Text("Customize")
+                            .font(.custom("Arial Hebrew", size: 32))
+                            .foregroundColor(.white)
+                        
+                        Text("your own musical")
+                            .font(.custom("Arial Hebrew", size: 32))
+                            .foregroundColor(.white)
+                        
+                        Text("vibrations.")
+                            .font(.custom("Arial Hebrew", size: 32))
+                            .foregroundColor(
+                                Color(
+                                    red: 72/255,
+                                    green: 245/255,
+                                    blue: 196/255
+                                ) // #48F5C4
+                            )
+                    }
+                    .multilineTextAlignment(.center)
+                    
+                  
+                    .offset(y: 205)
+                    
+                    Spacer()
+                    
                     // Dots
                     HStack(spacing: 8) {
                         
@@ -66,19 +94,21 @@ struct Onb3: View {
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 33)
+                                
                                     .stroke(
                                         Color(
                                             red: 45/255,
                                             green: 45/255,
                                             blue: 45/255
-                                        ), // #2D2D2D
+                                        ),
                                         lineWidth: 1.2
                                     )
                             )
                             .cornerRadius(33)
+                        
                     }
                     .padding(.horizontal, 36)
-                    .padding(.bottom, 42)
+                    .padding(.bottom, 50)
                 }
             }
         }

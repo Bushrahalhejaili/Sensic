@@ -49,6 +49,33 @@ struct Onb2: View {
                     .padding(.top, 10)
 
                     Spacer()
+                    
+                    // Title
+                    VStack(spacing: -2) {
+                        
+                        Text("Each instrument")
+                            .font(.custom("Arial Hebrew", size: 32))
+                            .foregroundColor(.white)
+                        
+                        Text("has its own")
+                            .font(.custom("Arial Hebrew", size: 32))
+                            .foregroundColor(.white)
+                        
+                        Text("haptic feeling")
+                            .font(.custom("Arial Hebrew", size: 32))
+                            .foregroundColor(
+                                Color(
+                                    red: 50/255,
+                                    green: 125/255,
+                                    blue: 218/255
+                                ) // #327DDA
+                            )
+                    }
+                    .multilineTextAlignment(.center)
+                   
+                    .offset(y: 205)
+
+                    Spacer()
 
                     // Dots
                     HStack(spacing: 8) {
@@ -56,7 +83,7 @@ struct Onb2: View {
                         Circle()
                             .fill(Color.white.opacity(0.35))
                             .frame(width: 10, height: 10)
-                        
+                   
                         Circle()
                             .fill(Color.white)
                             .frame(width: 10, height: 10)
@@ -97,7 +124,7 @@ struct Onb2: View {
                             .cornerRadius(33)
                     }
                     .padding(.horizontal, 36)
-                    .padding(.bottom, 42)
+                    .padding(.bottom, 50)
                 }
             }
         }
