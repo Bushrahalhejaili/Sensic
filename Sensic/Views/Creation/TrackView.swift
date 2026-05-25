@@ -11,6 +11,17 @@
 //  three-part visual described in the design spec.
 //
 //
+//
+//  TrackView.swift
+//  Sensic
+//
+//  Workspace › Creation
+//  A recordable track that lives inside MainTimelineView. Owns the
+//  recording session state (notes + playhead) and renders the
+//  three-part visual described in the design spec.
+//
+//  Drop this in: Views/Creation/
+//
 
 import SwiftUI
 import Combine
@@ -296,6 +307,13 @@ final class TrackRecorder: ObservableObject, Identifiable {
     /// right.  Driven by the move-drag gesture and by the left
     /// resize handle.
     @Published var trackStartSec: TimeInterval = 0
+
+    /// Vertical lane this track occupies.  0 = top row (where the
+    /// primary recorder lives by default); 1 = the row directly
+    /// underneath, and so on.  Each row is `TrackView.stackedRowHeight`
+    /// tall, so tracks at different rows stack vertically without
+    /// overlapping.  Set by `MainTimelineView`'s paste handler.
+    @Published var trackRow: Int = 0
 
     /// Soft-deleted state.  When `true`, `TrackOverlay` renders
     /// `EmptyView()` for this recorder — the track disappears from
@@ -827,6 +845,13 @@ struct TrackView: View {
     static let bodyHeight: CGFloat       = 62
     static let headerHeight: CGFloat     = 14
     static let cornerRadius: CGFloat     = 5
+
+    /// Vertical distance between adjacent stacked tracks.  Equals
+    /// `bodyHeight` plus a small breathing gap so the header strip
+    /// of the lower track doesn't kiss the body of the upper one.
+    /// Used by `TrackOverlay` to translate `TrackRecorder.trackRow`
+    /// into a Y offset.
+    static let stackedRowHeight: CGFloat = 70
     static let noteHeight: CGFloat       = 2
     static let noteCornerRadius: CGFloat = 2
 
@@ -1016,9 +1041,13 @@ struct TrackOverlay: View {
                         selectionFrame
                     }
                 }
-                .offset(x: CGFloat(recorder.trackStartSec) * pixelsPerSecond
-                           + dragMoveX
-                           + dragLeftResizeX)
+                .offset(
+                    x: CGFloat(recorder.trackStartSec) * pixelsPerSecond
+                       + dragMoveX
+                       + dragLeftResizeX,
+                    y: CGFloat(recorder.trackRow)
+                       * TrackView.stackedRowHeight
+                )
                 // Final defensive line: every transaction reaching
                 // this view gets its animation stripped.  The .offset
                 // value can change between renders for many reasons

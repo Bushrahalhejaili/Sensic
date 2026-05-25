@@ -23,7 +23,30 @@
 //  • The ruler/grid Canvas is an Equatable subview; it redraws only
 //    on zoom or scroll.
 //
-
+//
+//  MainTimelineView.swift
+//  Sensic
+//
+//  Workspace › Creation
+//  Main Timeline Area — Adaptive Ruler, Horizontal Zoom, Dynamic Grid,
+//  and a smooth draggable Playhead.
+//
+//  This component has NO background of its own.
+//
+//  Why dragging is smooth
+//  ----------------------
+//  • The playhead position lives in an @Observable model. Only the
+//    small `TLPlayheadLayer` child reads it, so a drag re-renders
+//    ONLY that child — the parent body, ScrollView and Canvas are
+//    never invalidated.
+//  • The playhead is rendered OUTSIDE the timeline's
+//    `.compositingGroup()`, so scrubbing never re-rasterizes the
+//    heavy composited timeline buffer.
+//  • The ruler/grid Canvas is an Equatable subview; it redraws only
+//    on zoom or scroll.
+//
+//  Drop this in: Views/Creation/
+//
 
 import SwiftUI
 
@@ -568,7 +591,11 @@ struct MainTimelineView: View {
             * pixelsPerSecond
         let timelineX = TLLayout.rulerLeadingInset
             + trackOffsetX + trackLocalPoint.x
+        // Add the track's row offset so a menu raised from a
+        // pasted track in row 1+ anchors at the right vertical
+        // height — not at the top row.
         let timelineY = TLLayout.topBarHeight + 2
+            + CGFloat(target.trackRow) * TrackView.stackedRowHeight
             + trackLocalPoint.y
         let sourcePoint = CGPoint(
             x: timelineX - scrollOffsetX,
@@ -623,6 +650,13 @@ struct MainTimelineView: View {
             }
             let newTrack = TrackRecorder()
             newTrack.loadSnapshot(snap, atStartSec: startSec)
+            // Place the copy in the next vertical lane underneath
+            // everything currently on the timeline — primary plus
+            // pastes, including soft-deleted ones (so a redo of a
+            // delete doesn't collide with whatever was pasted on top).
+            let occupiedRows = [recorder.trackRow]
+                + pastedTracks.map { $0.trackRow }
+            newTrack.trackRow = (occupiedRows.max() ?? 0) + 1
             // Share the primary recorder's audio destination so the
             // copy actually makes sound during playback.  bind(to:)
             // also sets up an activeNotes sink, but its handler
