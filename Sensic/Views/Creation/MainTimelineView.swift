@@ -34,7 +34,7 @@ import SwiftUI
 
 // MARK: - Layout constants
 
-private enum TLLayout {
+enum TLLayout {
     static let containerWidth: CGFloat  = 402
     static let containerHeight: CGFloat = 349
     static let containerRadius: CGFloat = 15
@@ -345,6 +345,13 @@ struct MainTimelineView: View {
     /// body doesn't re-render at 60Hz; only the `TrackOverlay`
     /// subview observes the recorder and re-renders on each tick.
     let recorder: TrackRecorder
+
+    /// Two-way binding to the parent's `showEditSheet` flag.
+    /// Flipped to `true` from `handleMenuAction` when the user
+    /// picks "Edit" on a track's edit menu; the parent owns the
+    /// `.sheet(...)` modifier that actually presents the sheet so
+    /// the layout above and below the sheet can react.
+    @Binding var showEditSheet: Bool
 
     private let tickColor = Color.indigoBlue
     private let gridColor = Color.gray.opacity(0.2)
@@ -755,9 +762,11 @@ struct MainTimelineView: View {
             showRenameAlert = true
 
         case ("edit", _):
-            // Intentionally a no-op for now — Edit is a placeholder
-            // until we know what it should open.
-            break
+            // Raise the EditSheetView.  Parent owns the .sheet()
+            // modifier on the workspace so the surrounding layout
+            // (timeline height, piano vs. sheet placeholder) can
+            // react to the same flag.
+            showEditSheet = true
 
         default:
             break
@@ -854,7 +863,8 @@ struct MainTimelineView: View {
 // MARK: - Preview
 
 #Preview {
-    MainTimelineView(recorder: TrackRecorder())
+    MainTimelineView(recorder: TrackRecorder(),
+                     showEditSheet: .constant(false))
         .padding()
         .preferredColorScheme(.dark)
 }

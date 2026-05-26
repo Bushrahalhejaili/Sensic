@@ -23,6 +23,15 @@ struct CreationView: View {
     @State private var activeTab: Tab = .record
     @State private var showSettings = false
 
+    /// Whether the bottom Edit sheet is presented.  Flipped to
+    /// `true` from `MainTimelineView` when the user picks "Edit"
+    /// on a track's edit menu, and back to `false` when the sheet
+    /// is dismissed (drag-down or Done button).  The same flag
+    /// drives the conditional workspace layout: piano below the
+    /// timeline when false, a 10pt gap + 322pt placeholder when
+    /// true so the sheet has room to slide in.
+    @State private var showEditSheet: Bool = false
+
     enum Tab: Hashable { case record, practice }
 
     var body: some View {
@@ -131,9 +140,16 @@ struct CreationView: View {
                 .padding(.top, 20)
                 .padding(.bottom, 10)
 
-            MainTimelineView(recorder: recorder)
+            MainTimelineView(recorder: recorder,
+                             showEditSheet: $showEditSheet)
                 .frame(maxWidth: .infinity)
 
+            // Piano stays mounted (preserves audio + scroll state)
+            // but is hidden while the edit sheet is up.  Using
+            // `.opacity(0)` keeps the section's layout footprint
+            // intact so the rest of the page can't shift; toggling
+            // hit-testing off prevents stray taps from leaking
+            // through the invisible keys.
             PianoWithScroller(
                 vm: recordVM,
                 scrollState: scrollState
@@ -141,8 +157,15 @@ struct CreationView: View {
             .frame(height: CreationLayout.pianoBlockHeight)
             .padding(.top, 30)
             .padding(.bottom, 9)
+            .opacity(showEditSheet ? 0 : 1)
+            .allowsHitTesting(!showEditSheet)
         }
         .ignoresSafeArea(.container, edges: .bottom)
+        .sheet(isPresented: $showEditSheet) {
+            EditSheetView()
+                .presentationDetents([.height(322)])
+                .presentationDragIndicator(.visible)
+        }
     }
 
     // MARK: - Toolbar
