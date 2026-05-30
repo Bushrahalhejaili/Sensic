@@ -9,9 +9,9 @@ import Combine
 @MainActor
 final class PracticeVisualizerModel: ObservableObject {
 
-    static let columnCount = 18
+    static let columnCount = 17
     static let rowCount = 10
-    static let persistenceSeconds: TimeInterval = 3
+    static let persistenceSeconds: TimeInterval = 2
 
     private static let activeRowCount = rowCount
 
@@ -104,16 +104,32 @@ final class PracticeVisualizerModel: ObservableObject {
         releasedAtByColumn.removeAll()
     }
 
+    // MARK: - Fill Height
+    // كل نوتة عندها سقف مختلف حسب موقعها على البيانو
+    // النوتات الوسط (C4) توصل لـ 10 صفوف، الطرفين أقصاها 2 صفوف
+
     static func fillHeight(velocity: UInt8, holdDuration: TimeInterval, midi: UInt8) -> Int {
         let velocityCurve = pow(Double(velocity) / 127.0, 0.55)
-        let pitchNormalized = Double(midi - 21) / 87.0
-        let pitchShape = 0.3 + pitchNormalized * 0.7
-        let fromVelocity = velocityCurve * Double(activeRowCount) * pitchShape
-        let fromHold = min(3, holdDuration * 1.2)
-        return min(activeRowCount, max(1, Int(round(fromVelocity + fromHold))))
+
+        // Bell curve مركزها C4 (midi 60)
+        let center: Double = 60.0
+        let spread: Double = 28.0   // ← كبّري لتوسيع القمة
+        let normalized = Double(midi) - center
+        let bellShape = exp(-(normalized * normalized) / (2 * spread * spread))
+        // bellShape: 1.0 عند C4، ~0.15 عند الأطراف
+
+        let minRows: Double = 2.0
+        let maxRows: Double = Double(activeRowCount)   // 10
+        let maxFill = minRows + bellShape * (maxRows - minRows)
+
+        let fromVelocity = velocityCurve * maxFill * 0.7
+        let fromHold     = min(maxFill * 0.3, holdDuration * 1.5)
+
+        return min(Int(maxFill), max(1, Int(round(fromVelocity + fromHold))))
     }
 
-    /// Maps a key to a grid column based on where it sits inside the visible piano viewport.
+    // MARK: - Column mapping
+
     static func column(for midi: UInt8, scrollState: PianoScrollState) -> Int? {
         let viewport = max(scrollState.viewportWidth, 1)
         guard let centerX = keyCenterX(for: midi) else { return nil }
