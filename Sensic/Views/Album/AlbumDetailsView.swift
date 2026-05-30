@@ -318,3 +318,4 @@ extension AlbumDetailsView {
         albumID: album.id
     )
 }
+

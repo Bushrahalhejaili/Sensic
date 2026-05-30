@@ -5,23 +5,9 @@
 //  Created by Bushra Hatim Alhejaili on 24/05/2026.
 //
 
-//  Workspace › Creation
 //  A recordable track that lives inside MainTimelineView. Owns the
 //  recording session state (notes + playhead) and renders the
 //  three-part visual described in the design spec.
-//
-//
-
-//
-//  TrackView.swift
-//  Sensic
-//
-//  Workspace › Creation
-//  A recordable track that lives inside MainTimelineView. Owns the
-//  recording session state (notes + playhead) and renders the
-//  three-part visual described in the design spec.
-//
-//  Drop this in: Views/Creation/
 //
 
 import SwiftUI
@@ -122,7 +108,11 @@ struct UIKitDragGesture: UIViewRepresentable {
 /// held) end times measured in seconds from the start of the track.
 struct RecordedNote: Identifiable, Equatable {
     let id = UUID()
-    let midi: UInt8
+    /// `var` (not `let`) so the edit sheet's piano-roll drag can
+    /// move a note to a different lane without having to replace
+    /// the whole record — handy because the `id` should survive a
+    /// pitch change for selection / undo bookkeeping.
+    var midi: UInt8
     var startSeconds: TimeInterval
     var endSeconds: TimeInterval?
     let velocity: UInt8
@@ -860,6 +850,102 @@ final class TrackRecorder: ObservableObject, Identifiable {
         notes[index].endSeconds = time
     }
 
+    // MARK: Note editing (used by EditSheetView / PianoRollView)
+
+    /// Move a note to a different lane (vertical drag).  Looked up
+    /// by id rather than index so the caller doesn't have to track
+    /// array positions across re-renders.
+    func setNoteMidi(_ noteId: UUID, _ midi: UInt8) {
+        guard let idx = notes.firstIndex(where: { $0.id == noteId })
+            else { return }
+        notes[idx].midi = midi
+    }
+
+    /// Slide a note along the time axis (horizontal drag).
+    func setNoteStart(_ noteId: UUID, _ start: TimeInterval) {
+        guard let idx = notes.firstIndex(where: { $0.id == noteId })
+            else { return }
+        notes[idx].startSeconds = max(0, start)
+    }
+
+    /// Resize a note from the right edge.  `end` is clamped above
+    /// `startSeconds` so the duration can never go negative.
+    func setNoteEnd(_ noteId: UUID, _ end: TimeInterval) {
+        guard let idx = notes.firstIndex(where: { $0.id == noteId })
+            else { return }
+        notes[idx].endSeconds = max(notes[idx].startSeconds, end)
+    }
+
+    // MARK: Note add / delete (used by PianoRollView's tap-to-add /
+    //       tap-to-delete in the edit sheet)
+
+    /// Add a new note.  Pushed as a single undoable action so the
+    /// undo button removes it (and redo re-adds it), matching how
+    /// paste / delete-track behave.  `recordedDuration` grows if the
+    /// note runs past the current end so the timeline track contains it.
+    @discardableResult
+    func addNote(midi: UInt8,
+                 startSeconds: TimeInterval,
+                 endSeconds: TimeInterval,
+                 velocity: UInt8 = 100) -> UUID {
+        let start = max(0, startSeconds)
+        let note = RecordedNote(midi: midi,
+                                startSeconds: start,
+                                endSeconds: max(start, endSeconds),
+                                velocity: velocity)
+        let prevDuration = recordedDuration
+
+        insertNoteRaw(note)
+        if let end = note.endSeconds {
+            recordedDuration = max(recordedDuration, end)
+        }
+
+        pushUndoableAction(UndoableAction(
+            undo: { [weak self] in
+                self?.removeNoteRaw(note.id)
+                self?.recordedDuration = prevDuration
+            },
+            redo: { [weak self] in
+                guard let self else { return }
+                self.insertNoteRaw(note)
+                if let end = note.endSeconds {
+                    self.recordedDuration = max(self.recordedDuration, end)
+                }
+            }
+        ))
+        return note.id
+    }
+
+    /// Delete a note by id.  Undoable (undo re-adds it, redo removes
+    /// it again); releases it if it happens to be sounding.
+    func deleteNote(_ id: UUID) {
+        guard let note = notes.first(where: { $0.id == id }) else { return }
+        removeNoteRaw(id)
+        pushUndoableAction(UndoableAction(
+            undo: { [weak self] in self?.insertNoteRaw(note) },
+            redo: { [weak self] in self?.removeNoteRaw(id) }
+        ))
+    }
+
+    /// Append a note without touching the undo stacks — the caller's
+    /// `UndoableAction` owns the history.
+    private func insertNoteRaw(_ note: RecordedNote) {
+        guard !notes.contains(where: { $0.id == note.id }) else { return }
+        notes.append(note)
+    }
+
+    /// Remove a note by id without touching the undo stacks; releases
+    /// it cleanly if it's currently sounding.
+    private func removeNoteRaw(_ id: UUID) {
+        guard let idx = notes.firstIndex(where: { $0.id == id }) else { return }
+        let removed = notes.remove(at: idx)
+        if playbackPlayingIds.contains(removed.id) {
+            pianoVM?.noteOff(midi: removed.midi)
+            playbackPlayingIds.remove(removed.id)
+        }
+        playbackStartedIds.remove(removed.id)
+    }
+
     // MARK: Piano binding
 
     /// Subscribe to the piano's `RecordViewModel.activeNotes` so
@@ -1318,3 +1404,5 @@ struct TrackOverlay: View {
     }
     .preferredColorScheme(.dark)
 }
+
+

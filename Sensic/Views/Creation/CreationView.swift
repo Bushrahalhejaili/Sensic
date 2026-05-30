@@ -32,6 +32,15 @@ struct CreationView: View {
     /// true so the sheet has room to slide in.
     @State private var showEditSheet: Bool = false
 
+    /// The track currently being edited by the sheet — set by
+    /// `MainTimelineView` at the same instant it flips
+    /// `showEditSheet` to true.  Held here (rather than inside
+    /// the timeline) so the `.sheet` modifier on the workspace
+    /// can read it when constructing `EditSheetView`.  Cleared
+    /// on dismiss so a stale reference can't leak into the next
+    /// presentation.
+    @State private var editingRecorder: TrackRecorder? = nil
+
     enum Tab: Hashable { case record, practice }
 
     var body: some View {
@@ -141,7 +150,8 @@ struct CreationView: View {
                 .padding(.bottom, 10)
 
             MainTimelineView(recorder: recorder,
-                             showEditSheet: $showEditSheet)
+                             showEditSheet: $showEditSheet,
+                             editingRecorder: $editingRecorder)
                 .frame(maxWidth: .infinity)
 
             // Piano stays mounted (preserves audio + scroll state)
@@ -161,10 +171,17 @@ struct CreationView: View {
             .allowsHitTesting(!showEditSheet)
         }
         .ignoresSafeArea(.container, edges: .bottom)
-        .sheet(isPresented: $showEditSheet) {
-            EditSheetView()
-                .presentationDetents([.height(322)])
-                .presentationDragIndicator(.visible)
+        .sheet(isPresented: $showEditSheet,
+               onDismiss: { editingRecorder = nil }) {
+            // `editingRecorder` is set by MainTimelineView *before*
+            // it flips `showEditSheet` to true, so it's already
+            // populated by the time SwiftUI builds this content.
+            // Guarded just in case the order ever inverts.
+            if let target = editingRecorder {
+                EditSheetView(recorder: target)
+                    .presentationDetents([.height(322)])
+                    .presentationDragIndicator(.visible)
+            }
         }
     }
 
@@ -327,3 +344,6 @@ struct CreationView: View {
 #Preview {
     CreationView(store: .previewInstance())
 }
+
+
+

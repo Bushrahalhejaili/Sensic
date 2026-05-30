@@ -6,12 +6,15 @@
 //
 
 
+//
+//  EditSheetView.swift
+//  Sensic
+//
 //  Workspace › Creation
 //  The sheet that slides up when the user taps "Edit" on a
-//  track's edit menu.  For now it's just a system sheet with a
-//  navigation toolbar and a `TransparentSpaceBlue` background —
-//  the structure is in place so editing controls can be added
-//  later without re-doing the presentation plumbing.
+//  track's edit menu.  Hosts the vertically-scrolling piano
+//  roll (PianoRollView) which lets the user preview keys and
+//  reshape the track's notes.
 //
 //  Drop this in: Views/Creation/
 //
@@ -20,16 +23,21 @@ import SwiftUI
 
 // MARK: - EditSheetView
 
-/// Bottom sheet shown when the user taps the "Edit" action in a
-/// track's edit menu.  Presented from `CreationView` via a
-/// standard SwiftUI `.sheet`, pinned to a single 322pt detent so
-/// the size doesn't drift with content.
+/// Bottom sheet that appears when the user taps "Edit" on a
+/// track.  Presented from `CreationView` via `.sheet(item:)` so
+/// the recorder being edited is passed in directly — no extra
+/// state needed to identify which track this is.
 ///
-/// The view itself is intentionally sparse: a navigation toolbar
-/// (so the title bar / Done button look matches iOS conventions)
-/// over a flat `TransparentSpaceBlue` background.  Real editing
-/// controls will land here in a later iteration.
+/// The sheet is pinned to a single 322pt detent so its size
+/// doesn't drift with content.  The piano roll inside is
+/// scrollable; at this height roughly twelve key-rows are
+/// visible at any one time.
 struct EditSheetView: View {
+
+    /// The track whose notes are shown on the piano roll, and
+    /// whose `audioOutput` the playable keys drive.
+    let recorder: TrackRecorder
+
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -49,8 +57,19 @@ struct EditSheetView: View {
                 Color("TransparentSpaceBlue")
                     .ignoresSafeArea()
 
-                PianoRollView()
+                PianoRollView(recorder: recorder)
+                    // Keep the top gap below the drag indicator /
+                    // nav chrome…
                     .padding(.top, 24)
+                    // …but let the roll run all the way to the
+                    // sheet's bottom edge.  Without this it stops
+                    // at the bottom safe-area inset (the home-
+                    // indicator strip), leaving a band of bare
+                    // background showing through — the gap.  The
+                    // background already ignores the safe area, so
+                    // matching the roll to it closes the gap while
+                    // the top spacing stays exactly as set above.
+                    .ignoresSafeArea(.container, edges: .bottom)
             }
             // .navigationTitle("Edit")
             .navigationBarTitleDisplayMode(.inline)
@@ -67,8 +86,10 @@ struct EditSheetView: View {
     Color.black
         .ignoresSafeArea()
         .sheet(isPresented: .constant(true)) {
-            EditSheetView()
+            EditSheetView(recorder: TrackRecorder())
                 .presentationDetents([.height(322)])
                 .presentationDragIndicator(.visible)
         }
 }
+
+

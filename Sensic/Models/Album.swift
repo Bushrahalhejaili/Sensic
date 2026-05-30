@@ -21,3 +21,4 @@ final class Album: Identifiable, Codable {
         
     }
 }
+

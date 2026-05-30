@@ -12,3 +12,5 @@ enum InstrumentKind: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 }
+
+

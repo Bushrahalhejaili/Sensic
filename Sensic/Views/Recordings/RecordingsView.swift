@@ -145,3 +145,4 @@ struct RecordingsView: View {
         RecordingsView(store: store, viewModel: RecordingsViewModel(store: store))
     }
 }
+

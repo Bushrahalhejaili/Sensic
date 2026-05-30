@@ -61,3 +61,6 @@ final class PracticeViewModel: ObservableObject {
     //     sessions.removeAll { $0.id == id }
     // }
 }
+
+
+

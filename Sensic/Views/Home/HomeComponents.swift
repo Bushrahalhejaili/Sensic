@@ -486,3 +486,5 @@ struct WaveformBarsView: View {
         }
     }
 }
+
+

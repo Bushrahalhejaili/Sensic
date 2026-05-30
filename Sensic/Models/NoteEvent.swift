@@ -2,7 +2,7 @@
 //  NoteEvent.swift
 //  Sensic
 //
-//  Created by شهد عبدالله القحطاني on 29/11/1447 AH.
+//  Created by Bushra Hatim Alhejaili on 26/05/2026.
 //
 
 
@@ -14,8 +14,8 @@ import Foundation
 struct NoteEvent: Codable, Equatable {
     var midiNote:  UInt8
     var velocity:  UInt8
-    var timestamp: TimeInterval   // ثواني من بداية السشن
-    var duration:  TimeInterval   // كم ثانية ضغط المفتاح
+    var timestamp: TimeInterval
+    var duration:  TimeInterval
 }
 
 struct PracticeSession: Identifiable, Codable {
@@ -35,3 +35,5 @@ struct PracticeSession: Identifiable, Codable {
         self.createdAt       = .now
     }
 }
+
+

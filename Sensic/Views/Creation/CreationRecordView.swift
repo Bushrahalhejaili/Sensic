@@ -25,3 +25,5 @@ struct CreationRecordView: View {
         .padding(.top, 8)
     }
 }
+
+

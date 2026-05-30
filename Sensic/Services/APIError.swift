@@ -100,44 +100,33 @@ final class PracticeService {
     private let client = APIClient.shared
     private init() {}
 
-    // ── CREATE ────────────────────────────────
-    // POST /sessions
-    // استدعاء: let session = try await PracticeService.shared.create(title: "Morning")
+    
     func create(title: String) async throws -> PracticeSession {
         try await client.post("sessions", body: PracticeSession(title: title))
     }
 
-    // ── READ ALL ──────────────────────────────
-    // GET /sessions
-    // استدعاء: let sessions = try await PracticeService.shared.getAll()
+    
     func getAll() async throws -> [PracticeSession] {
         try await client.get("sessions")
     }
 
-    // ── READ ONE ──────────────────────────────
-    // GET /sessions/:id
-    // استدعاء: let session = try await PracticeService.shared.get(id: someUUID)
+    
     func get(id: UUID) async throws -> PracticeSession {
         try await client.get("sessions/\(id.uuidString)")
     }
 
-    // ── SAVE (بعد انتهاء التسجيل) ─────────────
-    // POST /sessions/:id
-    // استدعاء: try await PracticeService.shared.save(session: currentSession)
+    
     func save(session: PracticeSession) async throws -> PracticeSession {
         try await client.post("sessions/\(session.id.uuidString)", body: session)
     }
 
-    // ── DELETE ────────────────────────────────
-    // DELETE /sessions/:id
-    // استدعاء: try await PracticeService.shared.delete(id: someUUID)
+    
     func delete(id: UUID) async throws {
         try await client.delete("sessions/\(id.uuidString)")
     }
 
-    // ── ADD NOTE (أثناء التسجيل) ───────────────
-    // POST /sessions/:id/notes
-    // استدعاء: try await PracticeService.shared.addNote(sessionId: id, note: event)
+    
+    
     func addNote(sessionId: UUID, note: NoteEvent) async throws {
         struct Body: Encodable { let note: NoteEvent }
         let _: PracticeSession = try await client.post(
@@ -146,3 +135,6 @@ final class PracticeService {
         )
     }
 }
+
+
+

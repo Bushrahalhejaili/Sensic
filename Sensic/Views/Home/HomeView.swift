@@ -228,3 +228,5 @@ struct HomeView: View {
 #Preview("List") {
     HomeView(store: .previewInstance())
 }
+
+

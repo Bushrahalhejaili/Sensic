@@ -31,6 +31,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 // MARK: - Layout constants
 
@@ -352,6 +353,12 @@ struct MainTimelineView: View {
     /// `.sheet(...)` modifier that actually presents the sheet so
     /// the layout above and below the sheet can react.
     @Binding var showEditSheet: Bool
+
+    /// Which track the edit sheet should open against.  Set by
+    /// `handleMenuAction` at the same time it raises
+    /// `showEditSheet`, so the parent has both pieces in place
+    /// before SwiftUI builds the sheet's content.
+    @Binding var editingRecorder: TrackRecorder?
 
     private let tickColor = Color.indigoBlue
     private let gridColor = Color.gray.opacity(0.2)
@@ -761,11 +768,18 @@ struct MainTimelineView: View {
             renameText      = recorder.trackName
             showRenameAlert = true
 
-        case ("edit", _):
+        case ("edit", let target):
             // Raise the EditSheetView.  Parent owns the .sheet()
             // modifier on the workspace so the surrounding layout
             // (timeline height, piano vs. sheet placeholder) can
-            // react to the same flag.
+            // react to the same flag.  Capture which recorder we
+            // were editing so the sheet's piano roll can read its
+            // notes; emptySpace edits fall back to the primary
+            // recorder since there's no per-track context.
+            switch target {
+            case .track(let recorder):     editingRecorder = recorder
+            case .emptySpace:              editingRecorder = recorder
+            }
             showEditSheet = true
 
         default:
@@ -864,7 +878,10 @@ struct MainTimelineView: View {
 
 #Preview {
     MainTimelineView(recorder: TrackRecorder(),
-                     showEditSheet: .constant(false))
+                     showEditSheet: .constant(false),
+                     editingRecorder: .constant(nil))
         .padding()
         .preferredColorScheme(.dark)
 }
+
+

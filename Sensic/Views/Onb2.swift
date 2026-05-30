@@ -134,3 +134,6 @@ struct Onb2: View {
 #Preview {
     Onb2()
 }
+
+
+

@@ -96,3 +96,5 @@ final class PianoScrollState: ObservableObject {
         setOffset(clamped * maxOffset)
     }
 }
+
+
