@@ -6,12 +6,7 @@
 //
 
 
-//
-//  PianoRollView.swift
-//  Sensic
-//
-//  Workspace › Creation › Edit Sheet
-//
+
 //  The FULL sheet content — when CreationView opens the edit
 //  sheet, this view fills the sheet detent.  The rounded
 //  card chrome, the head strip, the vertical piano, the
@@ -20,8 +15,7 @@
 //  directly via `.sheet(…)` with the detent and
 //  drag-indicator modifiers attached to it.
 //
-//  Layout (matches the Figma — "Before any scrolling" and
-//  "After scrolling left and right and up and down"):
+//  Layout :
 //
 //    ┌─ card (no fill — empty gaps show through) ───────┐
 //    │  ┌─ HEAD ───────────────────────────────────┐    │
@@ -83,7 +77,6 @@
 //    uses the SAME spacer + the SAME per-slot heights, so the
 //    two stay locked together row-for-row.
 //
-//  Drop this in: Views/Creation/
 //
 
 import SwiftUI

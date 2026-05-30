@@ -15,7 +15,7 @@ struct CreationView: View {
     // recordVM is still here because PianoWithScroller takes it and
     // the piano keys need a model for live audio + visual feedback.
     // None of its recording APIs are called from this view anymore.
-    @StateObject private var recordVM = RecordViewModel()
+    @ObservedObject private var recordVM = AudioEngine.shared
     @StateObject private var practiceVM = PracticeViewModel()
     @StateObject private var scrollState = PianoScrollState()
     @StateObject private var recorder = TrackRecorder()

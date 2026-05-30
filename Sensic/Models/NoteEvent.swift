@@ -6,9 +6,6 @@
 //
 
 
-// PracticeSession.swift
-// Sensic
-
 import Foundation
 
 struct NoteEvent: Codable, Equatable {

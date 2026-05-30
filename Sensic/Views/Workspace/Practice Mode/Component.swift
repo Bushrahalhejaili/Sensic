@@ -1,7 +1,8 @@
 //
-//  PracticeNoteVisualizer.swift
+//  Component.swift
 //  Sensic
 //
+
 
 import SwiftUI
 

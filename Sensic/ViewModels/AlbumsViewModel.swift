@@ -1,4 +1,5 @@
-////  AlbumsViewModel.swift
+//
+//  AlbumsViewModel.swift
 //  Sensic
 //
 import Foundation

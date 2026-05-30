@@ -2,6 +2,8 @@
 //  AlbumDetailsView.swift
 //  Sensic
 //
+
+
 import SwiftUI
 
 struct AlbumDetailsView: View {

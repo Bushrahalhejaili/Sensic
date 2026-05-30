@@ -5,10 +5,6 @@
 //  Created by شهد عبدالله القحطاني on 01/12/1447 AH.
 //
 
-
-// PracticeViewModel.swift
-// Sensic
-
 import Foundation
 import Combine
 

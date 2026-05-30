@@ -4,19 +4,10 @@
 //
 //  Created by Bushra Hatim Alhejaili on 26/05/2026.
 //
-
-
-//
-//  EditSheetView.swift
-//  Sensic
-//
-//  Workspace › Creation
 //  The sheet that slides up when the user taps "Edit" on a
 //  track's edit menu.  Hosts the vertically-scrolling piano
 //  roll (PianoRollView) which lets the user preview keys and
 //  reshape the track's notes.
-//
-//  Drop this in: Views/Creation/
 //
 
 import SwiftUI

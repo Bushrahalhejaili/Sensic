@@ -1,5 +1,5 @@
 //
-//  PracticeVisualizerShapes.swift
+//  PracticeNoteVisualizer.swift
 //  Sensic
 //
 
