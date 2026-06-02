@@ -46,6 +46,8 @@ struct AlbumsView: View {
                 }
             }
             .animation(.easeInOut(duration: 0.2), value: vm.showCreateAlbum)
+            .navigationBarBackButtonHidden(true)
+
         }
     }
 
@@ -147,6 +149,8 @@ extension AlbumsView {
                     NavigationLink {
 
                         AlbumDetailsView(vm: vm, albumID: album.id)
+                            .navigationBarBackButtonHidden(true)
+
                     } label: {
 
                         albumCard(album)
