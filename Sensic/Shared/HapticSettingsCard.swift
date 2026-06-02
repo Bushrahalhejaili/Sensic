@@ -10,21 +10,6 @@
 //  so changes in one mode appear immediately in the other.
 //
 
-//
-//  HapticSettingsCard.swift
-//  Sensic
-//
-//  Created by Bushra Hatim Alhejaili on 31/05/2026.
-//
-//  Shared haptic settings panel — used by both Practice mode
-//  (always visible inside the workspace) and Record mode
-//  (presented behind a button trigger). Binds to HapticSettings
-//  so changes in one mode appear immediately in the other.
-//
-//  Fixed card geometry: 366×170 Navy background (no glass effect
-//  on the card itself; glass is only on the style buttons). All
-//  inner spacings are pixel-pegged per the Figma spec.
-//
 
 import SwiftUI
 
