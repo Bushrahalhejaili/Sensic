@@ -3,6 +3,11 @@
 //  Sensic
 //
 
+//
+//  CreationView.swift
+//  Sensic
+//
+
 import SwiftUI
 
 // MARK: - CreationView
@@ -16,12 +21,18 @@ struct CreationView: View {
     // the piano keys need a model for live audio + visual feedback.
     // None of its recording APIs are called from this view anymore.
     @ObservedObject private var recordVM = AudioEngine.shared
+    @ObservedObject private var hapticSettings = HapticSettings.shared
     @StateObject private var practiceVM = PracticeViewModel()
     @StateObject private var scrollState = PianoScrollState()
     @StateObject private var recorder = TrackRecorder()
 
     @State private var activeTab: Tab = .record
-    @State private var showSettings = false
+
+    /// Whether the haptic settings card is presented above the
+    /// timeline.  Toggled by the slider-icon button in the toolbar.
+    /// When true, the card slides in and the timeline shrinks from
+    /// 349pt to 169pt to make room.
+    @State private var showHapticCard = false
 
     /// Whether the bottom Edit sheet is presented.  Flipped to
     /// `true` from `MainTimelineView` when the user picks "Edit"
@@ -149,10 +160,30 @@ struct CreationView: View {
                 .padding(.top, 20)
                 .padding(.bottom, 10)
 
+            // Haptic settings card — slides in between the toolbar
+            // and the timeline when the slider-icon button is tapped.
+            // Practice mode shows the same card always-visible; here
+            // it's behind a trigger so the timeline keeps the full
+            // workspace by default.
+            if showHapticCard {
+                HapticSettingsCard(settings: hapticSettings)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 10)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            // Timeline shrinks from 349 → 169 when the card is up.
+            // The internal layout still renders at 349pt; `.clipped()`
+            // hides the bottom portion so the ruler at the top stays
+            // visible and any tracks remain in place when the card
+            // closes again.
             MainTimelineView(recorder: recorder,
                              showEditSheet: $showEditSheet,
                              editingRecorder: $editingRecorder)
                 .frame(maxWidth: .infinity)
+                .frame(height: showHapticCard ? 169 : 349,
+                       alignment: .top)
+                .clipped()
 
             // Piano stays mounted (preserves audio + scroll state)
             // but is hidden while the edit sheet is up.  Using
@@ -211,10 +242,12 @@ struct CreationView: View {
                 glassCircleButton(
                     icon: "slider.horizontal.3",
                     iconSize: 20,
+                    iconColor: showHapticCard ? .white : Color("MainPurple"),
+                    isActive: showHapticCard,
                     action: {
                         withAnimation(.spring(response: 0.38,
                                               dampingFraction: 0.86)) {
-                            showSettings.toggle()
+                            showHapticCard.toggle()
                         }
                     }
                 )
@@ -245,6 +278,7 @@ struct CreationView: View {
         icon: String,
         iconSize: CGFloat,
         iconColor: Color = Color("MainPurple"),
+        isActive: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -254,7 +288,9 @@ struct CreationView: View {
                 .frame(width: 44, height: 44)
                 .background(
                     Circle()
-                        .fill(Color("Navy").opacity(0.95))
+                        .fill(isActive
+                              ? Color("MainPurple")
+                              : Color("Navy").opacity(0.95))
                         .overlay(
                             Circle().strokeBorder(
                                 glassShineGradient,
@@ -344,6 +380,3 @@ struct CreationView: View {
 #Preview {
     CreationView(store: .previewInstance())
 }
-
-
-
