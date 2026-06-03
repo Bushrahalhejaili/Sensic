@@ -10,6 +10,7 @@
 //  file holds only the visual.
 //
 
+
 import Foundation
 import Combine
 import QuartzCore
@@ -407,6 +408,11 @@ final class TrackRecorder: ObservableObject, Identifiable {
         isPlayingBack    = false
         isAdvancing      = false
         isDeleted        = false
+        // Mirrors the reset in beginFreshRecording(): if the user
+        // undid a re-record (which restored a custom name onto the
+        // primary), then redid it, this brings the name back to the
+        // "Piano" default rather than leaving the old rename behind.
+        trackName        = "Piano"
     }
 
     /// Drop every per-note entry from the undo and redo stacks
@@ -453,6 +459,13 @@ final class TrackRecorder: ObservableObject, Identifiable {
         recordedDuration = 0
         isSelected = false
         trackStartSec = 0
+        // Reset the display name back to the "Piano" default so the
+        // next recording starts fresh — without this, a user who
+        // renamed the previous take (e.g. to "Melody") would see
+        // that custom name carry over onto the new recording.  The
+        // archived snapshot above keeps its name; this only resets
+        // the *primary* recorder.
+        trackName = "Piano"
         // A fresh recording on a previously-deleted track makes the
         // track visible again — recording into nothing wouldn't
         // make sense.

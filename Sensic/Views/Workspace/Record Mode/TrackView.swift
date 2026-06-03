@@ -11,6 +11,19 @@
 //  ViewModels/TrackRecorder.swift
 //
 
+//
+//  TrackView.swift
+//  Sensic
+//
+//  Created by Bushra Hatim Alhejaili on 24/05/2026.
+//
+//  Visual representation of a recordable track, plus the
+//  TrackOverlay wrapper that handles selection / move / resize
+//  affordances.  All the state (notes, playhead, recording
+//  lifecycle, undo/redo) lives on `TrackRecorder` — see
+//  ViewModels/TrackRecorder.swift
+//
+
 import SwiftUI
 
 // MARK: - TrackView
@@ -335,20 +348,29 @@ struct TrackOverlay: View {
         .strokeBorder(.white, lineWidth: 2)
         .allowsHitTesting(false)
         // Edge handles, straddling the frame's left and right edges
-        // (half outside, half inside).
+        // (capsule center sits ON the selection edge).  Offset
+        // values are -16 / +16 to recenter the capsule now that
+        // the handle's outer frame is 32 wide (was 4) — the visible
+        // capsule stays in the exact same place as before.
         .overlay(alignment: .leading) {
-            handle(side: .left).offset(x: -2)
+            handle(side: .left).offset(x: -16)
         }
         .overlay(alignment: .trailing) {
-            handle(side: .right).offset(x: 2)
+            handle(side: .right).offset(x: 16)
         }
     }
 
     private enum HandleSide { case left, right }
 
     /// A small vertical capsule that the user drags to resize the
-    /// track from one edge.  The hit area is generously expanded
-    /// with `.contentShape` so the handle is comfortable to grab.
+    /// track from one edge.  The visible capsule is 4×32, but it
+    /// sits inside a 32×60 outer frame which is the actual hit-test
+    /// area — same comfortable hit zone as before, just expressed
+    /// as a real frame size now, because UIKit's pan recognizer
+    /// only hit-tests inside its own UIView bounds.  Pan gesture
+    /// is the same `UIKitDragGesture` wrapper the body-drag uses;
+    /// keeping both edge resizes on UIKit is what kept the drag
+    /// smooth originally and re-applies the same fix here.
     private func handle(side: HandleSide) -> some View {
         Capsule()
             .fill(Color.black)
@@ -356,56 +378,51 @@ struct TrackOverlay: View {
                 Capsule().stroke(.white, lineWidth: 1)
             )
             .frame(width: 4, height: 32)
-            .contentShape(Rectangle()
-                .inset(by: -14))   // ~32×60 hit target
-            .highPriorityGesture(handleGesture(side: side))
-    }
+            .frame(width: 32, height: 60)
+            .contentShape(Rectangle())
+            .overlay {
+                UIKitDragGesture(
+                    onTap: nil,
+                    onChanged: { translation in
+                        let tx = translation.x
+                        let baseStartPx = CGFloat(recorder.trackStartSec)
+                            * pixelsPerSecond
+                        let baseWidthPx = CGFloat(recorder.recordedDuration)
+                            * pixelsPerSecond
+                        let minWidthPx  = CGFloat(0.5) * pixelsPerSecond
 
-    private func handleGesture(side: HandleSide) -> some Gesture {
-        DragGesture(minimumDistance: 0)
-            .onChanged { value in
-                let tx = value.translation.width
-                let baseStartPx  = CGFloat(recorder.trackStartSec)
-                    * pixelsPerSecond
-                let baseWidthPx  = CGFloat(recorder.recordedDuration)
-                    * pixelsPerSecond
-                let minWidthPx   = CGFloat(0.5) * pixelsPerSecond
+                        switch side {
+                        case .left:
+                            let minDx = -baseStartPx
+                            let maxDx = baseWidthPx - minWidthPx
+                            let clamped = min(maxDx, max(minDx, tx))
+                            dragLeftResizeX = clamped
+                            dragWidthDelta  = -clamped
 
-                // Same animation-killing wrapper as the move gesture.
-                var t = Transaction(animation: nil)
-                t.disablesAnimations = true
-                withTransaction(t) {
-                    switch side {
-                    case .left:
-                        let minDx = -baseStartPx
-                        let maxDx = baseWidthPx - minWidthPx
-                        let clamped = min(maxDx, max(minDx, tx))
-                        dragLeftResizeX = clamped
-                        dragWidthDelta  = -clamped
-
-                    case .right:
-                        let minDelta = minWidthPx - baseWidthPx
-                        dragWidthDelta = max(minDelta, tx)
+                        case .right:
+                            let minDelta = minWidthPx - baseWidthPx
+                            dragWidthDelta = max(minDelta, tx)
+                        }
+                    },
+                    onEnded: { _ in
+                        switch side {
+                        case .left:
+                            let dxSec = TimeInterval(
+                                dragLeftResizeX / pixelsPerSecond)
+                            recorder.setTrackStartSec(
+                                recorder.trackStartSec + dxSec)
+                            recorder.setRecordedDuration(
+                                recorder.recordedDuration - dxSec)
+                        case .right:
+                            let dwSec = TimeInterval(
+                                dragWidthDelta / pixelsPerSecond)
+                            recorder.setRecordedDuration(
+                                recorder.recordedDuration + dwSec)
+                        }
+                        dragLeftResizeX = 0
+                        dragWidthDelta  = 0
                     }
-                }
-            }
-            .onEnded { _ in
-                switch side {
-                case .left:
-                    let dxSec = TimeInterval(
-                        dragLeftResizeX / pixelsPerSecond)
-                    recorder.setTrackStartSec(
-                        recorder.trackStartSec + dxSec)
-                    recorder.setRecordedDuration(
-                        recorder.recordedDuration - dxSec)
-                case .right:
-                    let dwSec = TimeInterval(
-                        dragWidthDelta / pixelsPerSecond)
-                    recorder.setRecordedDuration(
-                        recorder.recordedDuration + dwSec)
-                }
-                dragLeftResizeX = 0
-                dragWidthDelta  = 0
+                )
             }
     }
 }

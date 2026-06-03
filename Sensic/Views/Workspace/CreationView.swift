@@ -3,12 +3,9 @@
 //  Sensic
 //
 
-//
-//  CreationView.swift
-//  Sensic
-//
 
 import SwiftUI
+
 
 // MARK: - CreationView
 
