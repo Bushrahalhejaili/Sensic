@@ -8,18 +8,17 @@
 import SwiftUI
 
 struct Onb3: View {
-    
-    @State private var showHome = false
+
+    /// Final onboarding screen.  Tapping "Get Started" sets this
+    /// to `true`, which (a) tells the app root to swap onboarding
+    /// out for `HomeView` and (b) persists the choice so future
+    /// launches go straight to Home.
+    @AppStorage("sensic.didCompleteOnboarding")
+    private var didCompleteOnboarding = false
 
     var body: some View {
-        
-        if showHome {
-            
-            HomeView()
-            
-        } else {
-            
-            ZStack {
+
+        ZStack {
                 
                 // Background
                 Image("Ong")
@@ -78,7 +77,7 @@ struct Onb3: View {
                     
                     // Get Started Button
                     Button(action: {
-                        showHome = true
+                        didCompleteOnboarding = true
                     }) {
                         Text("Get Started")
                             .font(.system(size: 20, weight: .semibold))
@@ -111,12 +110,9 @@ struct Onb3: View {
                     .padding(.bottom, 50)
                 }
             }
-        }
     }
 }
 
 #Preview {
     Onb3()
 }
-
-

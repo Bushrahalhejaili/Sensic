@@ -3,6 +3,7 @@
 //  Sensic
 //
 
+
 import SwiftUI
 
 // MARK: - Header
@@ -80,6 +81,7 @@ struct RecordingsSectionView: View {
     let section: RecordingSection
     let albumsStore: AlbumsStore
     @Binding var revealedRecordingID: UUID?
+    var onOpen: (Piece) -> Void
     var onRename: (Piece) -> Void
     var onAdd: (Piece) -> Void
     var onDelete: (Piece) -> Void
@@ -96,8 +98,9 @@ struct RecordingsSectionView: View {
                         piece: piece,
                         primaryAlbumName: albumsStore.firstAlbumName(forPieceID: piece.id),
                         revealedRecordingID: $revealedRecordingID,
+                        onOpen:   { onOpen(piece) },
                         onRename: { onRename(piece) },
-                        onAdd: { onAdd(piece) },
+                        onAdd:    { onAdd(piece) },
                         onDelete: { onDelete(piece) }
                     )
                 }
@@ -117,6 +120,7 @@ struct RecordingsSwipeRow: View {
     let piece: Piece
     var primaryAlbumName: String?
     @Binding var revealedRecordingID: UUID?
+    var onOpen: () -> Void = {}
     var onRename: () -> Void = {}
     var onAdd: () -> Void = {}
     var onDelete: () -> Void = {}
@@ -162,6 +166,17 @@ struct RecordingsSwipeRow: View {
             RecordingsCardView(piece: piece, primaryAlbumName: primaryAlbumName)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 .offset(x: rowOffset)
+                .contentShape(Rectangle())
+                // Tap closes the swipe actions if they're open, or
+                // reopens the recording in the editor otherwise —
+                // same pattern as the Home row.
+                .onTapGesture {
+                    if isRevealed {
+                        revealedRecordingID = nil
+                    } else {
+                        onOpen()
+                    }
+                }
                 .gesture(swipeGesture)
         }
         .frame(maxWidth: .infinity)
@@ -279,5 +294,3 @@ struct RecordingsToastView: View {
             .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
     }
 }
-
-

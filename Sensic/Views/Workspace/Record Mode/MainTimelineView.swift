@@ -5,6 +5,7 @@
 //  Created by Bushra Hatim Alhejaili on 19/05/2026.
 //
 
+
 import SwiftUI
 import UIKit
 
@@ -322,6 +323,14 @@ struct MainTimelineView: View {
     /// subview observes the recorder and re-renders on each tick.
     let recorder: TrackRecorder
 
+    /// Tracks created by Paste actions.  Each is a self-contained
+    /// `TrackRecorder` populated from the clipboard snapshot — they
+    /// share no state with the primary recorder.
+    ///
+    /// Owned by `CreationView` (lifted up so the save flow can see
+    /// every track on the timeline), passed in here as a binding.
+    @Binding var pastedTracks: [TrackRecorder]
+
     /// Two-way binding to the parent's `showEditSheet` flag.
     /// Flipped to `true` from `handleMenuAction` when the user
     /// picks "Edit" on a track's edit menu; the parent owns the
@@ -352,11 +361,6 @@ struct MainTimelineView: View {
     @State private var playhead = TLPlayheadModel()
 
     // MARK: Edit-menu state
-
-    /// Tracks created by Paste actions.  Each is a self-contained
-    /// `TrackRecorder` populated from the clipboard snapshot — they
-    /// share no state with the primary recorder.
-    @State private var pastedTracks: [TrackRecorder] = []
 
     /// What's on the clipboard (set by Copy, consumed by Paste).
     @State private var clipboard: TrackSnapshot?
@@ -853,10 +857,9 @@ struct MainTimelineView: View {
 
 #Preview {
     MainTimelineView(recorder: TrackRecorder(),
+                     pastedTracks: .constant([]),
                      showEditSheet: .constant(false),
                      editingRecorder: .constant(nil))
         .padding()
         .preferredColorScheme(.dark)
 }
-
-

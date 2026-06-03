@@ -9,21 +9,6 @@
 //  Core Haptics engine will be added in a follow-up.
 //
 
-//
-//  HapticSettings.swift
-//  Sensic
-//
-//  Created by Bushra Hatim Alhejaili on 31/05/2026.
-//
-
-
-//  Shared haptic settings — consumed by HapticSettingsCard in both
-//  Record and Practice modes. The three properties (intensity,
-//  sharpness, style) persist to UserDefaults so the user's
-//  adjustments survive between app launches. UI state only for
-//  now; the actual Core Haptics engine will be added in a
-//  follow-up and will read these same values.
-//
 
 import Foundation
 import Combine

@@ -7,20 +7,21 @@
 import SwiftUI
 
 struct Onb2: View {
-    
-    @State private var showHome = false
+
+    /// Same key as in `SensicApp` and `OnboardingView`.  Skipping
+    /// from the second onboarding screen persists the choice and
+    /// triggers the root-level swap to `HomeView`.
+    @AppStorage("sensic.didCompleteOnboarding")
+    private var didCompleteOnboarding = false
+
     @State private var showOnb3 = false
-    
+
     var body: some View {
-        
-        if showHome {
-            
-            HomeView()
-            
-        } else if showOnb3 {
-            
+
+        if showOnb3 {
+
             Onb3()
-            
+
         } else {
             
             ZStack {
@@ -38,7 +39,7 @@ struct Onb2: View {
                         Spacer()
                         
                         Button(action: {
-                            showHome = true
+                            didCompleteOnboarding = true
                         }) {
                             Text("Skip")
                                 .font(.system(size: 17, weight: .medium))
@@ -134,6 +135,3 @@ struct Onb2: View {
 #Preview {
     Onb2()
 }
-
-
-

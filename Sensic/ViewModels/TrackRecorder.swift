@@ -320,6 +320,68 @@ final class TrackRecorder: ObservableObject, Identifiable {
         trackName = trimmed.isEmpty ? "Piano" : trimmed
     }
 
+    /// Snapshot this track's recorded notes as `NoteEvent` values,
+    /// suitable for persistence inside a `Piece`.
+    ///
+    /// `timeOffset` is added to each note's `timestamp` — callers
+    /// that combine multiple tracks into one project pass the
+    /// track's `trackStartSec` here so the saved events use
+    /// absolute project time rather than per-track relative time.
+    ///
+    /// Notes that were still being held (`endSeconds == nil`) at
+    /// the moment of capture are clamped to the track's
+    /// `recordedDuration`, since a saved project shouldn't contain
+    /// notes with indefinite length.
+    func noteEvents(timeOffset: TimeInterval = 0) -> [NoteEvent] {
+        notes.map { note in
+            let end = note.endSeconds ?? recordedDuration
+            return NoteEvent(
+                midiNote:  note.midi,
+                velocity:  note.velocity,
+                timestamp: timeOffset + note.startSeconds,
+                duration:  max(0, end - note.startSeconds)
+            )
+        }
+    }
+
+    /// Capture this track's full state as a `TrackSnapshot` for
+    /// persistence inside a saved `Piece`.  Includes the timeline
+    /// layout fields (`trackStartSec`, `trackRow`) so reopening the
+    /// recording restores every track to the exact spot the user
+    /// left it.  Track name is preserved so per-track renames
+    /// survive across sessions.
+    func snapshot() -> TrackSnapshot {
+        TrackSnapshot(
+            notes:         notes,
+            duration:      recordedDuration,
+            name:          trackName,
+            trackStartSec: trackStartSec,
+            trackRow:      trackRow
+        )
+    }
+
+    /// Hydrate this recorder from a persisted snapshot, including
+    /// the full timeline position (start sec + row) — unlike
+    /// `loadSnapshot(_:atStartSec:)`, which is meant for paste and
+    /// lets the caller pick a fresh location.  Used by
+    /// `CreationView` when the user reopens a saved recording.
+    func loadFully(_ snap: TrackSnapshot) {
+        notes            = snap.notes
+        recordedDuration = snap.duration
+        trackName        = snap.name
+        trackStartSec    = max(0, snap.trackStartSec)
+        trackRow         = max(0, snap.trackRow)
+        isSelected       = false
+        isRecording      = false
+        isPlayingBack    = false
+        isAdvancing      = false
+        isDeleted        = false
+        playheadSeconds  = 0
+        undoStack.removeAll()
+        redoStack.removeAll()
+        refreshUndoRedo()
+    }
+
     /// "Delete" the track.  This is a SOFT delete: the visual is
     /// hidden (`TrackOverlay` checks `isDeleted` and renders
     /// `EmptyView()`) but the recorder's notes, duration, position,

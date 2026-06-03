@@ -11,18 +11,6 @@
 //  ViewModels/TrackRecorder.swift
 //
 
-//
-//  TrackView.swift
-//  Sensic
-//
-//  Created by Bushra Hatim Alhejaili on 24/05/2026.
-//
-//  Visual representation of a recordable track, plus the
-//  TrackOverlay wrapper that handles selection / move / resize
-//  affordances.  All the state (notes, playhead, recording
-//  lifecycle, undo/redo) lives on `TrackRecorder` — see
-//  ViewModels/TrackRecorder.swift
-//
 
 import SwiftUI
 

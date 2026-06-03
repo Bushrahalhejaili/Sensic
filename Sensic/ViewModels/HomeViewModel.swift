@@ -22,13 +22,36 @@ final class HomeViewModel {
     var recordings: [Piece] { store.pieces }
     var hasRecordings: Bool { !store.pieces.isEmpty }
 
-    /// Home panel only: last 4 by date (newest first). Full list lives on the Recordings screen.
+    /// Home panel only: last 4 by date (newest first), restricted
+    /// to pieces created within the last 7 calendar days.  Older
+    /// recordings disappear from the home page after a week but
+    /// remain available on the Recordings screen indefinitely.
     private let homeRecordingsPreviewLimit = 4
 
     var recentRecordings: [Piece] {
-        let sorted = store.pieces.sorted { $0.createdAt > $1.createdAt }
-        return Array(sorted.prefix(homeRecordingsPreviewLimit))
+        let calendar = Calendar.current
+        let now = Date()
+        let inLastSevenDays = store.pieces.filter { piece in
+            let days = calendar.dateComponents(
+                [.day],
+                from: calendar.startOfDay(for: piece.createdAt),
+                to:   calendar.startOfDay(for: now)
+            ).day ?? 0
+            return days < 7
+        }
+        return Array(
+            inLastSevenDays
+                .sorted { $0.createdAt > $1.createdAt }
+                .prefix(homeRecordingsPreviewLimit)
+        )
     }
+
+    /// True when there's at least one piece eligible for the home
+    /// panel right now.  Distinct from `hasRecordings`, which stays
+    /// true as long as ANY pieces exist (used for the "See All"
+    /// button — older recordings still live on Recordings even when
+    /// the home panel is empty).
+    var hasRecentRecordings: Bool { !recentRecordings.isEmpty }
 
     init(store: RecordingsStore = .shared) {
         self.store = store
@@ -71,5 +94,3 @@ final class HomeViewModel {
         )
     }
 }
-
-

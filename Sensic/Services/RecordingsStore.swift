@@ -3,6 +3,7 @@
 //  Sensic
 //
 
+
 import Foundation
 import Observation
 
@@ -37,11 +38,11 @@ final class RecordingsStore {
 
         if let storedPieces = loadPieces() {
             pieces = storedPieces
-        } else if !UserDefaults.standard.bool(forKey: didSeedKey) {
-            seedSampleData()
-            UserDefaults.standard.set(true, forKey: didSeedKey)
-            persist()
         }
+        // Production starts with an empty library; users build it up
+        // by saving recordings from CreationView.  `seedSampleData()`
+        // below is still used by `previewInstance()` so SwiftUI
+        // previews can render the panel with content.
     }
 
     func renamePiece(id: UUID, title: String) {
@@ -56,16 +57,41 @@ final class RecordingsStore {
     }
 
     @discardableResult
-    func savePiece(title: String, duration: TimeInterval, noteEvents: [NoteEvent]) -> Piece {
+    func savePiece(title: String,
+                   duration: TimeInterval,
+                   noteEvents: [NoteEvent],
+                   trackSnapshots: [TrackSnapshot]? = nil) -> Piece {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let piece = Piece(
             title: trimmed.isEmpty ? "Untitled" : trimmed,
             duration: max(0, duration),
-            noteEvents: noteEvents
+            noteEvents: noteEvents,
+            trackSnapshots: trackSnapshots
         )
         pieces.insert(piece, at: 0)
         persist()
         return piece
+    }
+
+    /// Update an existing piece's content in place.  Used when the
+    /// user taps Save on a recording that was already saved earlier
+    /// in this session (or reopened from the library) — the title
+    /// stays the same, only the musical content + duration get
+    /// refreshed.  Returns the updated piece, or `nil` if no piece
+    /// with that id exists in the store.
+    @discardableResult
+    func updatePiece(id: UUID,
+                     duration: TimeInterval,
+                     noteEvents: [NoteEvent],
+                     trackSnapshots: [TrackSnapshot]?) -> Piece? {
+        guard let index = pieces.firstIndex(where: { $0.id == id }) else {
+            return nil
+        }
+        pieces[index].duration       = max(0, duration)
+        pieces[index].noteEvents     = noteEvents
+        pieces[index].trackSnapshots = trackSnapshots
+        persist()
+        return pieces[index]
     }
 
     func showToast(_ message: String) {
@@ -110,6 +136,3 @@ final class RecordingsStore {
         ].sorted { $0.createdAt > $1.createdAt }
     }
 }
-
-
-

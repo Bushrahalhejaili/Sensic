@@ -3,12 +3,21 @@
 //  Sensic
 //
 
+
 import SwiftUI
 
 struct RecordingsView: View {
     @Bindable var store: RecordingsStore
     @Bindable var albumsStore: AlbumsStore
     @Bindable var viewModel: RecordingsViewModel
+
+    /// Called when the user taps a recording in the list.  Hosted
+    /// by `HomeView`, which uses it to pop this view and push the
+    /// editor for the tapped piece — keeping nav-stack management
+    /// in one place.  Optional so the standalone preview at the
+    /// bottom of this file keeps building without a stub.
+    var onOpenPiece: ((Piece) -> Void)? = nil
+
     @Environment(\.dismiss) private var dismiss
     @State private var isHeaderCollapsed = false
     @State private var pieceToAddToAlbum: Piece?
@@ -61,8 +70,9 @@ struct RecordingsView: View {
                                     section: section,
                                     albumsStore: albumsStore,
                                     revealedRecordingID: $viewModel.revealedRecordingID,
+                                    onOpen:   { onOpenPiece?($0) },
                                     onRename: { viewModel.piecePendingRename = $0 },
-                                    onAdd: { handleAddToAlbum($0) },
+                                    onAdd:    { handleAddToAlbum($0) },
                                     onDelete: { viewModel.piecePendingDelete = $0 }
                                 )
                             }

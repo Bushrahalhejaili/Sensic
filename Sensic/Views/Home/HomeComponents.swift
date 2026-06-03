@@ -3,6 +3,7 @@
 //  Sensic
 //
 
+
 import SwiftUI
 
 // MARK: - Layout (shared horizontal margins & card rhythm)
@@ -305,6 +306,7 @@ struct SwipeableRecordingRow: View {
     let piece: Piece
     var primaryAlbumName: String?
     @Binding var revealedRecordingID: UUID?
+    var onOpen: () -> Void = {}
     var onRename: () -> Void = {}
     var onAdd: () -> Void = {}
     var onDelete: () -> Void = {}
@@ -350,6 +352,19 @@ struct SwipeableRecordingRow: View {
             RecordingRowView(piece: piece, primaryAlbumName: primaryAlbumName)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 .offset(x: rowOffset)
+                .contentShape(Rectangle())
+                // Tap to reopen the recording in the editor.  If the
+                // swipe actions are revealed, the tap closes them
+                // first (matching the iOS Mail / Messages pattern)
+                // instead of opening — feels less surprising than
+                // navigating away from a half-completed gesture.
+                .onTapGesture {
+                    if isRevealed {
+                        revealedRecordingID = nil
+                    } else {
+                        onOpen()
+                    }
+                }
                 .gesture(swipeGesture)
         }
         .frame(maxWidth: .infinity)
@@ -466,5 +481,3 @@ struct WaveformBarsView: View {
         }
     }
 }
-
-

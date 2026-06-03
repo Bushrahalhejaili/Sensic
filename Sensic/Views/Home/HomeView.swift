@@ -4,12 +4,20 @@
 //
 //
 
+
 import SwiftUI
 
 private enum HomeDestination: Hashable {
     case creation
     case recordings
     case albums
+    /// Reopen an existing recording in CreationView with all its
+    /// tracks restored.  The piece is identified by its `id` so we
+    /// don't have to make `Piece` itself `Hashable`; the destination
+    /// view resolves the actual `Piece` out of the store at render
+    /// time, which also means an in-place edit immediately reflects
+    /// without re-navigating.
+    case editPiece(UUID)
 }
 
 struct HomeView: View {
@@ -98,11 +106,25 @@ struct HomeView: View {
                     RecordingsView(
                         store: store,
                         albumsStore: albumsStore,
-                        viewModel: recordingsViewModel
+                        viewModel: recordingsViewModel,
+                        onOpenPiece: openPieceFromRecordings
                     )
 
                 case .albums:
                     AlbumsView(albumsStore: albumsStore, recordingsStore: store)
+
+                case .editPiece(let id):
+                    if let piece = store.pieces.first(where: { $0.id == id }) {
+                        CreationView(
+                            store: store,
+                            loadingPiece: piece
+                        )
+                    } else {
+                        // Piece was deleted in another flow.  Drop
+                        // back to Home rather than show an empty
+                        // editor.
+                        EmptyView()
+                    }
                 }
             }
 
@@ -189,12 +211,31 @@ struct HomeView: View {
         navigationPath.append(HomeDestination.recordings)
     }
 
+    /// Push the editor for a piece tapped on Home — appends the
+    /// editPiece destination onto the nav path so a back-tap
+    /// returns to Home.
+    private func openPiece(_ piece: Piece) {
+        viewModel.revealedRecordingID = nil
+        navigationPath.append(HomeDestination.editPiece(piece.id))
+    }
+
+    /// Pop RecordingsView off the nav stack and push the editor.
+    /// Mirrors `openRecordingsAfterSave` but in the other direction
+    /// — used as the `onOpenPiece` callback for `RecordingsView`'s
+    /// row taps so a tap there also lands the user in CreationView.
+    private func openPieceFromRecordings(_ piece: Piece) {
+        if navigationPath.count > 0 {
+            navigationPath.removeLast()
+        }
+        navigationPath.append(HomeDestination.editPiece(piece.id))
+    }
+
     @ViewBuilder
     private var recordingsPanel: some View {
 
         VStack(spacing: 0) {
 
-            if viewModel.hasRecordings {
+            if viewModel.hasRecentRecordings {
 
                 ScrollView(showsIndicators: false) {
 
@@ -206,6 +247,9 @@ struct HomeView: View {
                                 piece: piece,
                                 primaryAlbumName: albumsStore.firstAlbumName(forPieceID: piece.id),
                                 revealedRecordingID: $viewModel.revealedRecordingID,
+                                onOpen: {
+                                    openPiece(piece)
+                                },
                                 onRename: {
                                     viewModel.piecePendingRename = piece
                                 },
@@ -231,7 +275,7 @@ struct HomeView: View {
         .frame(
             height: RecordingsPanelMetrics.panelHeight(
                 rowCount: viewModel.recentRecordings.count,
-                isEmpty: !viewModel.hasRecordings
+                isEmpty: !viewModel.hasRecentRecordings
             )
         )
         .background(
@@ -257,5 +301,3 @@ struct HomeView: View {
 #Preview("List") {
     HomeView(store: .previewInstance())
 }
-
-
