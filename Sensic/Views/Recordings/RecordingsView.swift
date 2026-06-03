@@ -7,9 +7,11 @@ import SwiftUI
 
 struct RecordingsView: View {
     @Bindable var store: RecordingsStore
+    @Bindable var albumsStore: AlbumsStore
     @Bindable var viewModel: RecordingsViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var isHeaderCollapsed = false
+    @State private var pieceToAddToAlbum: Piece?
 
     /// Collapse once scrolled past this offset; expand only below `headerExpandScrollThreshold` so the compact bar doesn’t flicker/bounce open.
     private let headerCollapseScrollThreshold: CGFloat = 24
@@ -57,9 +59,10 @@ struct RecordingsView: View {
                             ForEach(sections) { section in
                                 RecordingsSectionView(
                                     section: section,
+                                    albumsStore: albumsStore,
                                     revealedRecordingID: $viewModel.revealedRecordingID,
                                     onRename: { viewModel.piecePendingRename = $0 },
-                                    onAdd: { _ in viewModel.showAlbumsComingSoon() },
+                                    onAdd: { handleAddToAlbum($0) },
                                     onDelete: { viewModel.piecePendingDelete = $0 }
                                 )
                             }
@@ -71,7 +74,6 @@ struct RecordingsView: View {
                 .onScrollGeometryChange(for: CGFloat.self) { geo in
                     geo.contentOffset.y
                 } action: { _, offsetY in
-                    // Ignore top rubber-band; some builds report small negative values at rest.
                     let y = max(0, offsetY)
                     let collapsed: Bool
                     if y > headerCollapseScrollThreshold {
@@ -99,12 +101,10 @@ struct RecordingsView: View {
                 RecordingsToastView(message: message)
                     .padding(.top, 72)
                     .transition(.move(edge: .top).combined(with: .opacity))
-                    .onAppear {
-                        Task {
-                            try? await Task.sleep(for: .seconds(2))
-                            withAnimation {
-                                viewModel.clearToast()
-                            }
+                    .task(id: message) {
+                        try? await Task.sleep(for: .seconds(2))
+                        withAnimation {
+                            viewModel.clearToast()
                         }
                     }
             }
@@ -112,10 +112,21 @@ struct RecordingsView: View {
         .preferredColorScheme(.dark)
         .toolbar(.hidden, for: .navigationBar)
         .task {
-            await viewModel.load()
+            await viewModel.loadIfNeeded()
+            await albumsStore.loadIfNeeded()
+            albumsStore.syncWithLibrary(validPieceIDs: Set(store.pieces.map(\.id)))
         }
         .sheet(item: $viewModel.piecePendingRename) { piece in
             RenameRecordingSheet(piece: piece, viewModel: viewModel)
+        }
+        .sheet(item: $pieceToAddToAlbum) { piece in
+            AddToAlbumPickerView(
+                piece: piece,
+                albumsStore: albumsStore,
+                recordingsStore: store,
+                onFinished: { pieceToAddToAlbum = nil },
+                onCancel: { pieceToAddToAlbum = nil }
+            )
         }
         .alert(
             "Delete recording?",
@@ -126,7 +137,7 @@ struct RecordingsView: View {
             presenting: viewModel.piecePendingDelete
         ) { piece in
             Button("Delete", role: .destructive) {
-                viewModel.deletePiece(id: piece.id)
+                viewModel.deletePiece(id: piece.id, albumsStore: albumsStore)
                 viewModel.piecePendingDelete = nil
             }
             Button("Cancel", role: .cancel) {
@@ -137,12 +148,27 @@ struct RecordingsView: View {
         }
         .animation(.easeInOut(duration: 0.25), value: viewModel.toastMessage)
     }
+
+    private func handleAddToAlbum(_ piece: Piece) {
+        viewModel.revealedRecordingID = nil
+
+        guard albumsStore.hasAlbums else {
+            store.showToast("Create an album first")
+            return
+        }
+
+        albumsStore.syncWithLibrary(validPieceIDs: Set(store.pieces.map(\.id)))
+        pieceToAddToAlbum = piece
+    }
 }
 
 #Preview {
     let store = RecordingsStore.previewInstance()
     return NavigationStack {
-        RecordingsView(store: store, viewModel: RecordingsViewModel(store: store))
+        RecordingsView(
+            store: store,
+            albumsStore: AlbumsStore.previewInstance(),
+            viewModel: RecordingsViewModel(store: store)
+        )
     }
 }
-

@@ -247,7 +247,7 @@ private func glassCircleButton(
             name: "The great divide",
             pieceIDs: []
         ),
-        recordings: vm.allRecordings,
+        recordings: vm.allRecordingsForPicker(),
         onSave: { _ in }
     )
 }

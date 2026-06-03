@@ -9,7 +9,23 @@ import Observation
 
 struct AlbumsView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var vm = AlbumsViewModel()
+    @Bindable var albumsStore: AlbumsStore
+    @Bindable var recordingsStore: RecordingsStore
+    @State private var vm: AlbumsViewModel
+
+    init(
+        albumsStore: AlbumsStore = .shared,
+        recordingsStore: RecordingsStore = .shared
+    ) {
+        _albumsStore = Bindable(wrappedValue: albumsStore)
+        _recordingsStore = Bindable(wrappedValue: recordingsStore)
+        _vm = State(
+            initialValue: AlbumsViewModel(
+                albumsStore: albumsStore,
+                recordingsStore: recordingsStore
+            )
+        )
+    }
     
     var body: some View {
         
@@ -23,7 +39,7 @@ struct AlbumsView: View {
                     topBar
                     titleSection
                     
-                    if vm.albums.isEmpty {
+                    if albumsStore.albums.isEmpty {
                         emptyState
                     } else {
                         albumsContent
@@ -47,6 +63,12 @@ struct AlbumsView: View {
             }
             .animation(.easeInOut(duration: 0.2), value: vm.showCreateAlbum)
             .navigationBarBackButtonHidden(true)
+            .onAppear {
+                if albumsStore.shouldPresentCreateOnAlbumsAppear {
+                    vm.showCreateAlbum = true
+                    albumsStore.shouldPresentCreateOnAlbumsAppear = false
+                }
+            }
 
         }
     }
@@ -105,7 +127,7 @@ extension AlbumsView {
                 .font(.system(size: 42, weight: .bold))
                 .foregroundStyle(.white)
 
-            Text("\(vm.albums.count) Albums")
+            Text("\(albumsStore.albums.count) Albums")
                 .font(.system(size: 17))
                 .foregroundStyle(Color("tertiary"))
         }
@@ -144,7 +166,7 @@ extension AlbumsView {
                 spacing: 14
             ) {
 
-                ForEach(vm.albums, id: \.id) { album in
+                ForEach(albumsStore.albumsNewestFirst, id: \.id) { album in
 
                     NavigationLink {
 

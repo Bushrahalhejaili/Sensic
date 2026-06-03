@@ -18,6 +18,8 @@ final class RecordingsViewModel {
     var piecePendingRename: Piece?
     var piecePendingDelete: Piece?
 
+    private(set) var hasLoaded = false
+
     var toastMessage: String? {
         get { store.toastMessage }
         set { store.toastMessage = newValue }
@@ -27,7 +29,9 @@ final class RecordingsViewModel {
         self.store = store
     }
 
-    func load() async {
+    func loadIfNeeded() async {
+        guard !hasLoaded else { return }
+        hasLoaded = true
         isLoading = true
         await store.loadIfNeeded()
         isLoading = false
@@ -40,16 +44,12 @@ final class RecordingsViewModel {
         return true
     }
 
-    func deletePiece(id: UUID) {
+    func deletePiece(id: UUID, albumsStore: AlbumsStore) {
         store.deletePiece(id: id)
+        albumsStore.removePieceFromAllAlbums(id)
         if revealedRecordingID == id {
             revealedRecordingID = nil
         }
-    }
-
-    /// Albums are not implemented yet — placeholder for Add/Move actions.
-    func showAlbumsComingSoon() {
-        store.showToast("Albums coming soon")
     }
 
     func clearToast() {

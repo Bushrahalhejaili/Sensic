@@ -22,6 +22,15 @@ struct RecordingItem: Identifiable, Equatable {
         self.duration = duration
         self.date = date
     }
+
+    init(piece: Piece) {
+        self.init(
+            id: piece.id,
+            title: piece.title,
+            duration: piece.formattedDuration,
+            date: piece.listDateLabel()
+        )
+    }
 }
 
 
