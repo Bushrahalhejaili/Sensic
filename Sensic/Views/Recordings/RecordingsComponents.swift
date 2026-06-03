@@ -73,11 +73,12 @@ struct RecordingsHeaderView: View {
 
 private enum RecordingsSectionLayout {
     static let cardInset: CGFloat = 12
-    static let rowSpacing: CGFloat = 12
+    static let rowSpacing: CGFloat = 9
 }
 
 struct RecordingsSectionView: View {
     let section: RecordingSection
+    let albumsStore: AlbumsStore
     @Binding var revealedRecordingID: UUID?
     var onRename: (Piece) -> Void
     var onAdd: (Piece) -> Void
@@ -93,6 +94,7 @@ struct RecordingsSectionView: View {
                 ForEach(section.pieces) { piece in
                     RecordingsSwipeRow(
                         piece: piece,
+                        primaryAlbumName: albumsStore.firstAlbumName(forPieceID: piece.id),
                         revealedRecordingID: $revealedRecordingID,
                         onRename: { onRename(piece) },
                         onAdd: { onAdd(piece) },
@@ -113,6 +115,7 @@ struct RecordingsSectionView: View {
 
 struct RecordingsSwipeRow: View {
     let piece: Piece
+    var primaryAlbumName: String?
     @Binding var revealedRecordingID: UUID?
     var onRename: () -> Void = {}
     var onAdd: () -> Void = {}
@@ -142,7 +145,7 @@ struct RecordingsSwipeRow: View {
                     action: onRename
                 )
                 RecordingSwipeAction(
-                    title: "Add",
+                    title: "Move",
                     icon: "folder",
                     background: Color("MainPurple"),
                     action: onAdd
@@ -156,7 +159,7 @@ struct RecordingsSwipeRow: View {
             }
             .frame(maxHeight: .infinity, alignment: .center)
 
-            RecordingsCardView(piece: piece)
+            RecordingsCardView(piece: piece, primaryAlbumName: primaryAlbumName)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 .offset(x: rowOffset)
                 .gesture(swipeGesture)
@@ -207,37 +210,16 @@ struct RecordingsSwipeRow: View {
 
 struct RecordingsCardView: View {
     let piece: Piece
+    var primaryAlbumName: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(piece.title)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-
-                Spacer(minLength: 8)
-
-                Text(piece.listDateLabel())
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(Color("tertiary"))
-            }
-
-            HStack(spacing: 8) {
-                WaveformBarsView(barColor: .white.opacity(0.85), heights: piece.waveformHeights)
-                    .frame(height: 18)
-                    .id(piece.id)
-
-                Text(piece.formattedDuration)
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(Color("tertiary"))
-            }
-        }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous)
-                .fill(Color("SpaceBlue"))
-        )
+        RecordingPieceCardContent(piece: piece, primaryAlbumName: primaryAlbumName)
+            .padding(RecordingCardLayout.cardInsets)
+            .frame(minHeight: RecordingCardLayout.cardMinHeight, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous)
+                    .fill(Color("SpaceBlue"))
+            )
     }
 }
 

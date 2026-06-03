@@ -17,6 +17,8 @@ final class HomeViewModel {
     var piecePendingRename: Piece?
     var piecePendingDelete: Piece?
 
+    private(set) var hasPerformedInitialLoad = false
+
     var recordings: [Piece] { store.pieces }
     var hasRecordings: Bool { !store.pieces.isEmpty }
 
@@ -32,8 +34,13 @@ final class HomeViewModel {
         self.store = store
     }
 
-    func load() async {
+    /// Runs once per app session — avoids re-fetch when the home screen refreshes after Add.
+    func performInitialLoad(albumsStore: AlbumsStore) async {
+        guard !hasPerformedInitialLoad else { return }
+        hasPerformedInitialLoad = true
         await store.loadIfNeeded()
+        await albumsStore.loadIfNeeded()
+        albumsStore.syncWithLibrary(validPieceIDs: Set(store.pieces.map(\.id)))
     }
 
     func renamePiece(id: UUID, title: String) -> Bool {
@@ -43,15 +50,25 @@ final class HomeViewModel {
         return true
     }
 
-    func deletePiece(id: UUID) {
+    func deletePiece(id: UUID, albumsStore: AlbumsStore) {
         store.deletePiece(id: id)
+        albumsStore.removePieceFromAllAlbums(id)
         if revealedRecordingID == id {
             revealedRecordingID = nil
         }
     }
 
-    func showAlbumsComingSoon() {
-        store.showToast("Albums coming soon")
+    func finishAddToAlbum(
+        piece: Piece,
+        albumIDs: Set<UUID>,
+        albumsStore: AlbumsStore
+    ) {
+        AlbumAddToAlbumLogic.finish(
+            piece: piece,
+            albumIDs: albumIDs,
+            albumsStore: albumsStore,
+            recordingsStore: store
+        )
     }
 }
 

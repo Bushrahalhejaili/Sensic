@@ -98,7 +98,7 @@ struct AlbumDetailsView: View {
 
             if let album = currentAlbum {
 
-                RecordingsPickerView(album: album, recordings: vm.allRecordings) { selectedItems in
+                RecordingsPickerView(album: album, recordings: vm.allRecordingsForPicker()) { selectedItems in
                     vm.addRecordings(selectedItems, to: album)
                 }
             }

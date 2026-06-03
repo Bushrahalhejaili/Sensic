@@ -12,27 +12,59 @@
 import SwiftUI
 
 // ─────────────────────────────────────────────
+// MARK: - Glass shine (shared rim)
+// ─────────────────────────────────────────────
+
+enum SensicGlassChrome {
+    /// Angular gradient stroke shared by circle buttons and
+    /// capsule controls (HapticSettingsCard, CreationView).
+    static var glassShineGradient: AngularGradient {
+        AngularGradient(
+            gradient: Gradient(colors: [
+                Color.black.opacity(0.4),
+                Color.white.opacity(0.6),
+                Color.black.opacity(0.2),
+                Color.white.opacity(0.9),
+                Color.black.opacity(0.2),
+                Color.black.opacity(0.4)
+            ]),
+            center: .center
+        )
+    }
+}
+
+// ─────────────────────────────────────────────
 // MARK: - SensicGlassCircleButton
 // ─────────────────────────────────────────────
 
 struct SensicGlassCircleButton: View {
     let systemName: String
-    /// When true, icon turns white; circle stays Navy + glass (no fill swap).
-    var isActive: Bool = false
+    var iconSize: CGFloat = 16
     var iconColor: Color = Color("MainPurple")
+    /// When true, icon turns white and fill becomes MainPurple.
+    var isActive: Bool = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: iconSize, weight: .semibold))
                 .foregroundStyle(isActive ? .white : iconColor)
                 .frame(width: 44, height: 44)
-                .background {
+                .background(
                     Circle()
-                        .fill(Color("Navy"))
-                }
-                .glassEffect(in: .circle)
+                        .fill(isActive
+                              ? Color("MainPurple")
+                              : Color("Navy").opacity(0.95))
+                        .overlay(
+                            Circle().strokeBorder(
+                                SensicGlassChrome.glassShineGradient,
+                                lineWidth: 0.4
+                            )
+                        )
+                        .glassEffect(.clear)
+                )
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
     }

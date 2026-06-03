@@ -56,7 +56,9 @@ struct MoveRecordingSheet: View {
     }
 
     private var destinationAlbums: [Album] {
-        albums.filter { $0.id != currentAlbumID }
+        albums
+            .filter { $0.id != currentAlbumID }
+            .sorted { $0.createdAt > $1.createdAt }
     }
 
     private func albumRow(_ album: Album) -> some View {

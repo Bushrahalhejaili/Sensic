@@ -256,9 +256,9 @@ private struct RecordingActionButton: View {
 enum RecordingsPanelMetrics {
     static let cornerRadius: CGFloat = 20
     static let innerCornerRadius: CGFloat = 20
-    static let rowHeight: CGFloat = 72
-    static let rowSpacing: CGFloat = 10
-    static let panelInset: CGFloat = 16
+    static let rowHeight: CGFloat = RecordingCardLayout.cardMinHeight
+    static let rowSpacing: CGFloat = 9
+    static let panelInset: CGFloat = 14
 
     static func panelHeight(rowCount: Int, isEmpty: Bool) -> CGFloat {
         if isEmpty { return 200 }
@@ -303,6 +303,7 @@ struct RecordingsEmptyState: View {
 
 struct SwipeableRecordingRow: View {
     let piece: Piece
+    var primaryAlbumName: String?
     @Binding var revealedRecordingID: UUID?
     var onRename: () -> Void = {}
     var onAdd: () -> Void = {}
@@ -346,7 +347,7 @@ struct SwipeableRecordingRow: View {
             }
             .frame(maxHeight: .infinity, alignment: .center)
 
-            RecordingRowView(piece: piece)
+            RecordingRowView(piece: piece, primaryAlbumName: primaryAlbumName)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 .offset(x: rowOffset)
                 .gesture(swipeGesture)
@@ -433,38 +434,16 @@ struct RecordingSwipeAction: View {
 
 struct RecordingRowView: View {
     let piece: Piece
+    var primaryAlbumName: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(piece.title)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-
-                Spacer(minLength: 8)
-
-                Text(piece.relativeTimestamp)
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(Color("tertiary"))
-            }
-
-            HStack(spacing: 8) {
-                WaveformBarsView(barColor: .white.opacity(0.85), heights: piece.waveformHeights)
-                    .frame(height: 18)
-                    .id(piece.id)
-
-                Text(piece.formattedDuration)
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(Color("tertiary"))
-            }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: RecordingsPanelMetrics.rowHeight, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: RecordingsPanelMetrics.innerCornerRadius, style: .continuous)
-                .fill(Color("SpaceBlue"))
-        )
+        RecordingPieceCardContent(piece: piece, primaryAlbumName: primaryAlbumName)
+            .padding(RecordingCardLayout.cardInsets)
+            .frame(maxWidth: .infinity, minHeight: RecordingCardLayout.cardMinHeight, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: RecordingsPanelMetrics.innerCornerRadius, style: .continuous)
+                    .fill(Color("SpaceBlue"))
+            )
     }
 }
 
@@ -473,6 +452,7 @@ struct WaveformBarsView: View {
 
     let barColor: Color
     let heights: [CGFloat]
+    var maxBarHeight: CGFloat = 18
     var barWidth: CGFloat = 2.5
     var spacing: CGFloat = 2
 
@@ -481,7 +461,7 @@ struct WaveformBarsView: View {
             ForEach(Array(heights.enumerated()), id: \.offset) { _, height in
                 Capsule()
                     .fill(barColor)
-                    .frame(width: barWidth, height: 28 * height)
+                    .frame(width: barWidth, height: max(2, maxBarHeight * height))
             }
         }
     }

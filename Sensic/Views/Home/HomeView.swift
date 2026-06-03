@@ -14,13 +14,19 @@ private enum HomeDestination: Hashable {
 
 struct HomeView: View {
     @Bindable private var store: RecordingsStore
+    @Bindable private var albumsStore: AlbumsStore
     @State private var viewModel: HomeViewModel
     @State private var recordingsViewModel: RecordingsViewModel
     @State private var navigationPath = NavigationPath()
+    @State private var pieceToAddToAlbum: Piece?
 
     @MainActor
-    init(store: RecordingsStore = .shared) {
+    init(
+        store: RecordingsStore = .shared,
+        albumsStore: AlbumsStore = .shared
+    ) {
         _store = Bindable(wrappedValue: store)
+        _albumsStore = Bindable(wrappedValue: albumsStore)
         _viewModel = State(initialValue: HomeViewModel(store: store))
         _recordingsViewModel = State(initialValue: RecordingsViewModel(store: store))
     }
@@ -69,11 +75,9 @@ struct HomeView: View {
 
                         Spacer()
                     }
-                    .onAppear {
-                        Task {
-                            try? await Task.sleep(for: .seconds(2))
-                            store.clearToast()
-                        }
+                    .task(id: message) {
+                        try? await Task.sleep(for: .seconds(2))
+                        store.clearToast()
                     }
                 }
             }
@@ -93,11 +97,12 @@ struct HomeView: View {
                 case .recordings:
                     RecordingsView(
                         store: store,
+                        albumsStore: albumsStore,
                         viewModel: recordingsViewModel
                     )
 
                 case .albums:
-                    AlbumsView()
+                    AlbumsView(albumsStore: albumsStore, recordingsStore: store)
                 }
             }
 
@@ -122,7 +127,7 @@ struct HomeView: View {
             ) { piece in
 
                 Button("Delete", role: .destructive) {
-                    viewModel.deletePiece(id: piece.id)
+                    viewModel.deletePiece(id: piece.id, albumsStore: albumsStore)
                     viewModel.piecePendingDelete = nil
                 }
 
@@ -136,7 +141,17 @@ struct HomeView: View {
             }
 
             .task {
-                await viewModel.load()
+                await viewModel.performInitialLoad(albumsStore: albumsStore)
+            }
+
+            .sheet(item: $pieceToAddToAlbum) { piece in
+                AddToAlbumPickerView(
+                    piece: piece,
+                    albumsStore: albumsStore,
+                    recordingsStore: store,
+                    onFinished: { pieceToAddToAlbum = nil },
+                    onCancel: { pieceToAddToAlbum = nil }
+                )
             }
         }
     }
@@ -151,6 +166,19 @@ struct HomeView: View {
 
     private func openAlbums() {
         navigationPath.append(HomeDestination.albums)
+    }
+
+    private func handleAddToAlbum(_ piece: Piece) {
+        viewModel.revealedRecordingID = nil
+
+        guard albumsStore.hasAlbums else {
+            albumsStore.shouldPresentCreateOnAlbumsAppear = true
+            openAlbums()
+            return
+        }
+
+        albumsStore.syncWithLibrary(validPieceIDs: Set(store.pieces.map(\.id)))
+        pieceToAddToAlbum = piece
     }
 
     private func openRecordingsAfterSave() {
@@ -176,12 +204,13 @@ struct HomeView: View {
 
                             SwipeableRecordingRow(
                                 piece: piece,
+                                primaryAlbumName: albumsStore.firstAlbumName(forPieceID: piece.id),
                                 revealedRecordingID: $viewModel.revealedRecordingID,
                                 onRename: {
                                     viewModel.piecePendingRename = piece
                                 },
                                 onAdd: {
-                                    viewModel.showAlbumsComingSoon()
+                                    handleAddToAlbum(piece)
                                 },
                                 onDelete: {
                                     viewModel.piecePendingDelete = piece

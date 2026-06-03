@@ -85,8 +85,8 @@ struct CreationView: View {
 
     private var headerBar: some View {
         HStack(spacing: 12) {
-            glassCircleButton(
-                icon: "chevron.left",
+            SensicGlassCircleButton(
+                systemName: "chevron.left",
                 iconSize: 20,
                 iconColor: .white,
                 action: { dismiss() }
@@ -99,8 +99,8 @@ struct CreationView: View {
             Spacer(minLength: 0)
 
             if activeTab == .record {
-                glassCircleButton(
-                    icon: "checkmark",
+                SensicGlassCircleButton(
+                    systemName: "checkmark",
                     iconSize: 20,
                     iconColor: .white,
                     action: {} // no-op
@@ -221,8 +221,8 @@ struct CreationView: View {
     private var toolBar: some View {
         HStack(spacing: 0) {
             HStack(spacing: 10) {
-                glassCircleButton(
-                    icon: "arrow.uturn.backward",
+                SensicGlassCircleButton(
+                    systemName: "arrow.uturn.backward",
                     iconSize: 20,
                     iconColor: recorder.canUndo
                         ? Color("MainPurple")
@@ -230,8 +230,8 @@ struct CreationView: View {
                     action: { recorder.undoTapped() }
                 )
 
-                glassCircleButton(
-                    icon: "arrow.uturn.forward",
+                SensicGlassCircleButton(
+                    systemName: "arrow.uturn.forward",
                     iconSize: 20,
                     iconColor: recorder.canRedo
                         ? Color("MainPurple")
@@ -239,8 +239,8 @@ struct CreationView: View {
                     action: { recorder.redoTapped() }
                 )
 
-                glassCircleButton(
-                    icon: "slider.horizontal.3",
+                SensicGlassCircleButton(
+                    systemName: "slider.horizontal.3",
                     iconSize: 20,
                     iconColor: showHapticCard ? .white : Color("MainPurple"),
                     isActive: showHapticCard,
@@ -257,51 +257,6 @@ struct CreationView: View {
 
             transportBar
         }
-    }
-
-    // Shared angular gradient for the glass rim.
-    private var glassShineGradient: AngularGradient {
-        AngularGradient(
-            gradient: Gradient(colors: [
-                Color.black.opacity(0.4),
-                Color.white.opacity(0.6),
-                Color.black.opacity(0.2),
-                Color.white.opacity(0.9),
-                Color.black.opacity(0.2),
-                Color.black.opacity(0.4)
-            ]),
-            center: .center
-        )
-    }
-
-    private func glassCircleButton(
-        icon: String,
-        iconSize: CGFloat,
-        iconColor: Color = Color("MainPurple"),
-        isActive: Bool = false,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: iconSize, weight: .semibold))
-                .foregroundStyle(iconColor)
-                .frame(width: 44, height: 44)
-                .background(
-                    Circle()
-                        .fill(isActive
-                              ? Color("MainPurple")
-                              : Color("Navy").opacity(0.95))
-                        .overlay(
-                            Circle().strokeBorder(
-                                glassShineGradient,
-                                lineWidth: 0.4
-                            )
-                        )
-                        .glassEffect(.clear)
-                )
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Transport bar
@@ -353,7 +308,7 @@ struct CreationView: View {
                 .fill(Color("Navy").opacity(0.95))
                 .overlay(
                     Capsule().strokeBorder(
-                        glassShineGradient,
+                        SensicGlassChrome.glassShineGradient,
                         lineWidth: 0.4
                     )
                 )
