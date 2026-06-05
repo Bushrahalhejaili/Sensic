@@ -182,7 +182,7 @@ extension AlbumsView {
             .padding(.top, 24)
         }
     }
-
+//
     private func albumCard(_ album: Album) -> some View {
 
         VStack(alignment: .leading, spacing: 14) {
