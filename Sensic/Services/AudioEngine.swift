@@ -5,6 +5,7 @@
 //  Created by Bushra Hatim Alhejaili on 30/05/2026.
 //
 
+
 import Foundation
 import AVFoundation
 import Combine
@@ -56,12 +57,21 @@ final class AudioEngine: ObservableObject {
         sampler.startNote(midi, withVelocity: velocity, onChannel: 0)
         activeNotes.insert(midi)
         activeNoteVelocities[midi] = velocity
+
+        // Pair every audible note with its tactile counterpart.
+        // Calling from inside AudioEngine (rather than from the
+        // call sites) means recording playback also triggers
+        // haptics for free — TrackRecorder and PianoSection both
+        // already funnel through this method.
+        HapticEngine.shared.noteOn(midi: midi, velocity: velocity)
     }
 
     func noteOff(midi: UInt8) {
         sampler.stopNote(midi, onChannel: 0)
         activeNotes.remove(midi)
         activeNoteVelocities.removeValue(forKey: midi)
+
+        HapticEngine.shared.noteOff(midi: midi)
     }
 
     func stopAll() {
@@ -70,5 +80,7 @@ final class AudioEngine: ObservableObject {
         }
         activeNotes.removeAll()
         activeNoteVelocities.removeAll()
+
+        HapticEngine.shared.stopAll()
     }
 }

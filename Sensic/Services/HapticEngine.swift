@@ -2,11 +2,27 @@
 //  HapticEngine.swift
 //  Sensic
 //
+//  Created by Bushra Hatim Alhejaili on 06/06/2026.
+//
+
+
+
+//
+//  HapticEngine.swift
+//  Sensic
+//
 //  Wraps Core Haptics to implement Sensic's per-key haptic mapping:
 //
 //      (1) transient event at note-on  (the hammer strike)
 //      (2) continuous event while held (the held body of the note)
-//      (3) parameter-curve fade on release
+//      (3) immediate stop on note-off  (haptic tracks the finger)
+//
+//  The third stage used to be a parameter-curve fade over the
+//  note's `default_release_time_s` — that mimicked a real piano
+//  string's decay but left the haptic running 50–300ms after the
+//  finger lifted.  The audio sampler's soundbank already provides
+//  the musical release tail, so the haptic now stops the instant
+//  the finger leaves the key.
 //
 //  Differences from the demo's HapticEngineManager:
 //
@@ -152,16 +168,57 @@ final class HapticEngine {
         // 100 reads as a confident-but-not-max press.
         let velNorm = clamp01(Double(velocity) / 127.0)
 
-        // ── Per-note haptic parameters (from the JSON chart) ──
+        // ── Per-note haptic parameters ──────────────────────────
         //
         // The transient and continuous intensities scale with
         // velocity using the spec's affine formulas.  Sharpness
-        // comes from the per-key effective base, so different keys
-        // feel different even at the same velocity.
-        let baseTrInt = 0.25 + 0.75 * velNorm        // strike strength
-        let baseCoInt = 0.10 + 0.45 * velNorm        // held strength
-        let baseTrShp = row.effective_base_sharpness
-        let baseCoShp = row.effective_base_sharpness
+        // would come from the per-key `effective_base_sharpness`
+        // in the JSON chart, but the spec's value range (0.20 to
+        // 0.87) leaves about 35% of Core Haptics' usable 0..1
+        // sharpness range on the table.  We stretch it to
+        // 0.05..0.95 below so adjacent keys are pushed slightly
+        // further apart on the perceptual scale — within human
+        // JND limits, every bit of headroom helps.
+        //
+        // We also compute a pitch-coupled balance between the
+        // transient (strike) and continuous (held buzz) events.
+        // The skin can't resolve 88 distinct sharpness levels —
+        // adjacent notes will always sit too close on that axis to
+        // feel different — so we stack a second perceptual cue on
+        // top: low notes get a quieter strike but a fuller, deeper
+        // held buzz; high notes get a sharper strike but barely
+        // any held body.  This turns the difference between
+        // registers into a qualitative shift (rumble vs click)
+        // rather than just a quantitative one (more vs less
+        // sharpness), which our hands read much more reliably.
+        let pitchNorm  = row.pitch_norm_0_to_1            // 0 at A0, 1 at C8
+
+        // Sharpness range capped at 0.70 (rather than the spec's
+        // ~0.85 or our earlier 0.95) because Apple's Taptic Engine
+        // — a Linear Resonant Actuator tuned to ~230 Hz — starts
+        // losing physical amplitude as sharpness climbs past about
+        // 0.70.  The engine reports the same intensity number but
+        // the skin reads a noticeably thinner sensation.  Capping
+        // here keeps every key in the actuator's sweet spot while
+        // still leaving 0.65 of usable range — comfortably above
+        // sharpness JND for the per-register differences to land.
+        let baseSharp  = 0.05 + 0.65 * pitchNorm           // 0.05..0.70
+        let baseTrInt  = 0.25 + 0.75 * velNorm             // strike strength
+        let baseCoInt  = 0.10 + 0.45 * velNorm             // held strength
+        let baseTrShp  = baseSharp                          // (was effective_base_sharpness)
+        let baseCoShp  = baseSharp                          // (was effective_base_sharpness)
+
+        // Pitch-coupled balance: transient grows with pitch,
+        // continuous stays nearly flat with a tiny low-end favor.
+        // The qualitative character (low notes rumblier, high notes
+        // clickier) is now carried almost entirely by trPitchMul.
+        // We keep a small downward slope on coPitchMul (1.15..0.95)
+        // so low notes have a marginally fuller hum, but anything
+        // more aggressive compounds with the sharpness cap to make
+        // the top octave feel empty — which was exactly the bug we
+        // chased down here.
+        let trPitchMul = 0.6  + 0.8  * pitchNorm            // 0.6 → 1.4
+        let coPitchMul = 1.15 - 0.20 * pitchNorm            // 1.15 → 0.95
 
         // ── User-driven modifiers (read live from settings) ──
         //
@@ -186,13 +243,18 @@ final class HapticEngine {
         let trShpStyleOff      = style.transientSharpnessOffset
         let coIntStyleMul      = style.continuousIntensityMultiplier
         let coShpStyleOff      = style.continuousSharpnessOffset
-        let releaseStyleMul    = style.releaseTimeMultiplier
 
         // Combine and clamp to the Core Haptics 0..1 valid range.
-        let trInt = clamp01(baseTrInt * trIntStyleMul  * intensityMul)
-        let trShp = clamp01(baseTrShp + trShpStyleOff  + sharpnessOffset)
-        let coInt = clamp01(baseCoInt * coIntStyleMul  * intensityMul)
-        let coShp = clamp01(baseCoShp + coShpStyleOff  + sharpnessOffset)
+        // Note the extra `trPitchMul` / `coPitchMul` factor in the
+        // intensity products — that's the pitch-coupled balance
+        // doing its work.  Sharpness still varies with pitch only
+        // through the stretched `baseSharp`; layering offsets on
+        // top of an already-pitch-driven base would compress the
+        // per-key differences again.
+        let trInt = clamp01(baseTrInt * trIntStyleMul * intensityMul * trPitchMul)
+        let trShp = clamp01(baseTrShp + trShpStyleOff + sharpnessOffset)
+        let coInt = clamp01(baseCoInt * coIntStyleMul * intensityMul * coPitchMul)
+        let coShp = clamp01(baseCoShp + coShpStyleOff + sharpnessOffset)
 
         // ── (1) Hammer-strike transient ──
         let transient = CHHapticEvent(
@@ -208,9 +270,17 @@ final class HapticEngine {
         //
         // We set `.sustained = 1` and give the event a long nominal
         // duration (30s) so the player stays alive until we
-        // explicitly stop it on note-off.  The release time is
-        // pre-multiplied by the style's release multiplier — Smooth
-        // stretches it, Punchy shortens it.
+        // explicitly stop it on note-off.
+        //
+        // Note: there is intentionally NO `.releaseTime` parameter
+        // here.  The original spec called for a release fade that
+        // mimicked a real piano string's decay, but in practice
+        // that fade made the haptic feel disconnected from the
+        // finger — you'd lift off and the buzz would linger up to
+        // ~300ms on low notes.  The audio sampler still produces a
+        // natural release tail in the soundbank, so dropping the
+        // haptic instantly on note-off keeps the *sound* musical
+        // while the *touch* tracks the finger.
         let continuous = CHHapticEvent(
             eventType: .hapticContinuous,
             parameters: [
@@ -220,8 +290,6 @@ final class HapticEngine {
                       value: Float(row.default_attack_time_s)),
                 .init(parameterID: .decayTime,
                       value: Float(row.default_decay_time_s)),
-                .init(parameterID: .releaseTime,
-                      value: Float(row.default_release_time_s * releaseStyleMul)),
                 .init(parameterID: .sustained, value: 1.0)
             ],
             relativeTime: 0,
@@ -239,50 +307,25 @@ final class HapticEngine {
         }
     }
 
-    /// Apply the parameter-curve fade and then hard-stop the player
-    /// for `midi`.  Safe to call for a MIDI that isn't currently
-    /// held — it just no-ops.
+    /// Stop the haptic for `midi` immediately when the finger
+    /// lifts.  Safe to call for a MIDI that isn't currently held —
+    /// it just no-ops.
     func noteOff(midi: UInt8) {
         guard isSupported,
               let entry = activePlayers.removeValue(forKey: midi)
         else { return }
 
-        let releaseTime = max(
-            0.05,
-            entry.row.default_release_time_s
-                * HapticSettings.shared.style.releaseTimeMultiplier
-        )
-
-        // ── (3) Parameter-curve fade to zero intensity ──
-        //
-        // `.hapticIntensityControl` is a meta-parameter that scales
-        // every event's intensity in the running pattern; ramping
-        // it 1.0 → 0.0 over `releaseTime` produces the perceived
-        // release tail without abruptly cutting off.
-        do {
-            let curve = CHHapticParameterCurve(
-                parameterID: .hapticIntensityControl,
-                controlPoints: [
-                    .init(relativeTime: 0,           value: 1.0),
-                    .init(relativeTime: releaseTime, value: 0.0)
-                ],
-                relativeTime: 0
-            )
-            try entry.player.scheduleParameterCurve(
-                curve, atTime: CHHapticTimeImmediate
-            )
-        } catch {
-            print("⚠️ HapticEngine noteOff fade curve \(midi): \(error)")
-        }
-
-        // Hard-stop after the fade so the engine reclaims the
-        // Advanced player slot.  A small grace period (50ms) lets
-        // the curve finish playing before stop() cuts in.
-        let player = entry.player
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: UInt64((releaseTime + 0.05) * 1_000_000_000))
-            try? player.stop(atTime: CHHapticTimeImmediate)
-        }
+        // Hard-stop, no fade.  An earlier version of this function
+        // scheduled a `.hapticIntensityControl` parameter curve
+        // fading 1.0 → 0.0 over the note's `default_release_time_s`,
+        // then stopped the player after the fade.  That mimicked a
+        // real piano's release tail but left the haptic running for
+        // 50–300ms after the finger left the key — long enough to
+        // feel disconnected from the touch.  Since the audio
+        // sampler's own envelope provides the musical release, we
+        // let touch be touch and cut the buzz the moment the finger
+        // lifts.
+        try? entry.player.stop(atTime: CHHapticTimeImmediate)
     }
 
     /// Immediately silence every held note.  Used on app
@@ -339,13 +382,6 @@ extension HapticStyle {
         switch self {
         case .smooth: return -0.10
         case .punchy: return +0.05
-        }
-    }
-
-    var releaseTimeMultiplier: Double {
-        switch self {
-        case .smooth: return 1.60   // stretches the tail
-        case .punchy: return 0.55   // snaps it off
         }
     }
 }

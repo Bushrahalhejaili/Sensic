@@ -2,6 +2,12 @@
 //  HapticChartLoader.swift
 //  Sensic
 //
+//  Created by Bushra Hatim Alhejaili on 06/06/2026.
+//
+
+
+
+//
 //  Loads piano_88_key_core_haptics_chart.json from the app bundle
 //  exactly once and exposes O(1) lookup by MIDI note.
 //

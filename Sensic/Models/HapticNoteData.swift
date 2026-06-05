@@ -2,6 +2,11 @@
 //  HapticNoteData.swift
 //  Sensic
 //
+//  Created by Bushra Hatim Alhejaili on 06/06/2026.
+//
+
+
+
 //  Codable model that mirrors one row of
 //  piano_88_key_core_haptics_chart.json (one per MIDI key, A0–C8).
 //
