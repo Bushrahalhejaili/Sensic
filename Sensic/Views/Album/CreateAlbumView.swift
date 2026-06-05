@@ -54,9 +54,21 @@ import SwiftUI
                         .bold()
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
-                        .background(Capsule().fill(Color("tertiary").opacity(0.35)))
-                        .foregroundStyle(.white)
+                        .background(
+                            Capsule()
+                                .fill(
+                                    vm.albumName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                    ? Color.white.opacity(0.08)
+                                    : Color("tertiary").opacity(0.35)
+                                )
+                        )
+                        .foregroundStyle(
+                            vm.albumName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            ? Color.white.opacity(0.3)
+                            : .white
+                        )
                 }
+                .disabled(vm.albumName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .padding(20)

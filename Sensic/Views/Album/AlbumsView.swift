@@ -187,10 +187,10 @@ extension AlbumsView {
 
         VStack(alignment: .leading, spacing: 14) {
 
-            Spacer()
+           // Spacer()
 
             Text(album.name)
-                .font(.system(size: 22, weight: .bold))
+                .font(.system(size: 32, weight: .bold))
                 .foregroundStyle(.white)
 
             Divider()

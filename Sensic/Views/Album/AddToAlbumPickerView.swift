@@ -205,6 +205,11 @@ struct AddToAlbumPickerView: View {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .stroke(Color("MainPurple").opacity(0.35), lineWidth: 1)
         )
+        // Make the whole card tappable to toggle selection
+        .contentShape(Rectangle())
+        .onTapGesture {
+            toggleAlbum(album)
+        }
     }
 
     private func toggleAlbum(_ album: Album) {
