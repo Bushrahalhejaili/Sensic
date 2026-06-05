@@ -2,6 +2,10 @@
 //  RecordingsPickerView.swift
 //  Sensic
 //
+//
+//  RecordingsPickerView.swift
+//  Sensic
+//
 
 import SwiftUI
 
@@ -66,11 +70,7 @@ extension RecordingsPickerView {
 
             Spacer()
 
-            glassCircleButton(
-                icon: "checkmark",
-                iconSize: 18,
-                iconColor: Color("MainPurple")
-            ) {
+            purpleCircleButton {
                 let selectedItems = recordings.filter { selectedRecordings.contains($0.id) }
                 onSave(selectedItems)
                 dismiss()
@@ -118,8 +118,12 @@ extension RecordingsPickerView {
 
     private var filteredRecordings: [RecordingItem] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return recordings }
-        return recordings.filter {
+
+        let all = recordings
+
+        guard !query.isEmpty else { return all }
+
+        return all.filter {
             $0.title.localizedCaseInsensitiveContains(query)
             || $0.duration.localizedCaseInsensitiveContains(query)
             || $0.date.localizedCaseInsensitiveContains(query)
@@ -161,7 +165,7 @@ extension RecordingsPickerView {
             )
 
             Button {
-                toggleSelection(recording.id)
+                toggle(recording)
             } label: {
                 ZStack {
                     Circle()
@@ -175,7 +179,9 @@ extension RecordingsPickerView {
 
                     Image(systemName: isSelected ? "checkmark" : "plus")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(isSelected ? Color("MainPurple") : Color.purple.opacity(0.8))
+                        .foregroundStyle(
+                            isSelected ? Color("MainPurple") : Color.purple.opacity(0.8)
+                        )
                 }
             }
             .buttonStyle(.plain)
@@ -183,57 +189,59 @@ extension RecordingsPickerView {
     }
 }
 
-// MARK: - Actions
+// MARK: - Toggle
 
 extension RecordingsPickerView {
-    private func toggleSelection(_ id: UUID) {
-        if selectedRecordings.contains(id) {
-            selectedRecordings.remove(id)
+
+    private func toggle(_ recording: RecordingItem) {
+        if selectedRecordings.contains(recording.id) {
+            selectedRecordings.remove(recording.id)
         } else {
-            selectedRecordings.insert(id)
+            selectedRecordings.insert(recording.id)
         }
     }
 }
 
-// MARK: - Shared UI Helpers (local to this file)
+// MARK: - Actions
 
-private var glassShineGradient: AngularGradient {
-    AngularGradient(
-        gradient: Gradient(colors: [
-            Color.black.opacity(0.4),
-            Color.white.opacity(0.6),
-            Color.black.opacity(0.2),
-            Color.white.opacity(0.9),
-            Color.black.opacity(0.2),
-            Color.black.opacity(0.4)
-        ]),
-        center: .center
-    )
-}
+extension RecordingsPickerView {
 
-private func glassCircleButton(
-    icon: String,
-    iconSize: CGFloat,
-    iconColor: Color = Color("MainPurple"),
-    action: @escaping () -> Void
-) -> some View {
-    Button(action: action) {
-        Image(systemName: icon)
-            .font(.system(size: iconSize, weight: .semibold))
-            .foregroundStyle(iconColor)
-            .frame(width: 44, height: 44)
-            .background(
-                Circle()
-                    .fill(Color("Navy").opacity(0.95))
-                    .overlay(
-                        Circle()
-                            .strokeBorder(glassShineGradient, lineWidth: 0.4)
-                    )
-                    .glassEffect(.clear)
-            )
-            .contentShape(Circle())
+    private func glassCircleButton(
+        icon: String,
+        iconSize: CGFloat,
+        iconColor: Color = .white,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: iconSize, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .background(
+                    Circle()
+                        .fill(Color("SpaceBlue"))
+                )
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
     }
-    .buttonStyle(.plain)
+
+    private func purpleCircleButton(
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: "checkmark")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .background(
+                    Circle()
+                        .fill(Color("MainPurple"))
+                )
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+    }
 }
 
 // MARK: - Preview
