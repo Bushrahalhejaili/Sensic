@@ -7,6 +7,7 @@ struct OnboardingView: View {
     /// the onboarding hierarchy out for `HomeView` — and persists
     /// the choice so onboarding never appears again on this
     /// device.
+    ///
     @AppStorage("sensic.didCompleteOnboarding")
     private var didCompleteOnboarding = false
 
@@ -21,13 +22,25 @@ struct OnboardingView: View {
         } else {
             
             ZStack {
-                
+                 
                 // Background
                 Image("Onp")
                     .resizable()
                     .scaledToFill()
                     .ignoresSafeArea()
-                
+    
+  
+              
+                Image("i1")
+                    .resizable()
+                    .scaledToFit()
+                    .scaleEffect(0.4)
+                    .offset(
+                        x: 0,
+                        y: -160
+                    )
+
+                 
                 VStack {
                     
                     // Skip
@@ -43,13 +56,13 @@ struct OnboardingView: View {
                         }
                     }
                     .padding(.horizontal, 28)
-                    .padding(.top, 10)
+                    .padding(.top, 30)
                     
                     Spacer()
                     
                     // Title
                     VStack(spacing: -2) {
-                        
+             
                         Text("Create your music")
                             .font(.custom("Arial Hebrew", size: 32))
                             .foregroundColor(.white)

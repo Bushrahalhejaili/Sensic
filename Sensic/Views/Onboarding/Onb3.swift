@@ -25,6 +25,15 @@ struct Onb3: View {
                     .resizable()
                     .scaledToFill()
                     .ignoresSafeArea()
+            Image("i3")
+                .resizable()
+                .scaledToFit()
+                .scaleEffect(0.5)
+                .offset(
+                    x: 0,
+                    y: -150
+                )
+
                 
                 VStack {
                     
@@ -54,7 +63,7 @@ struct Onb3: View {
                     .multilineTextAlignment(.center)
                     
                   
-                    .offset(y: 205)
+                    .offset(y: 220)
                     
                     Spacer()
                     

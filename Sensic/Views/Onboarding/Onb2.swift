@@ -26,11 +26,20 @@ struct Onb2: View {
             
             ZStack {
                 
-                // Background
+                // Background 
                 Image("Onb")
                     .resizable()
                     .scaledToFill()
                     .ignoresSafeArea()
+                Image("i2")
+                    .resizable()
+                    .scaledToFit()
+                    .scaleEffect(0.6)
+                    .offset(
+                        x: 0,
+                        y: -170
+                    )
+
 
                 VStack {
                     
@@ -45,9 +54,9 @@ struct Onb2: View {
                                 .font(.system(size: 17, weight: .medium))
                                 .foregroundColor(.white.opacity(0.9))
                         }
-                    }
+                    } 
                     .padding(.horizontal, 28)
-                    .padding(.top, 10)
+                    .padding(.top, 30)
 
                     Spacer()
                     
