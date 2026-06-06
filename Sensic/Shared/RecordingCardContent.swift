@@ -96,3 +96,55 @@ struct RecordingPieceCardContent: View {
         .frame(height: RecordingCardLayout.albumBadgeRowHeight, alignment: .trailing)
     }
 }
+
+// MARK: - Album detail row body (same layout as Home + Recordings)
+
+struct RecordingItemCardContent: View {
+    let recording: RecordingItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: RecordingCardLayout.rowSpacing) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(recording.title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+
+                Spacer(minLength: 8)
+
+                Text(recording.date)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(Color("tertiary"))
+            }
+
+            HStack(alignment: .center, spacing: 6) {
+                WaveformBarsView(
+                    barColor: .white.opacity(0.85),
+                    heights: recording.waveformHeights,
+                    maxBarHeight: RecordingCardLayout.waveformBarMaxHeight
+                )
+                .frame(height: RecordingCardLayout.waveformLaneHeight)
+                .id(recording.id)
+
+                Text(recording.duration)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(Color("tertiary"))
+
+                Spacer(minLength: 8)
+            }
+        }
+    }
+}
+
+extension RecordingItem {
+    var waveformHeights: [CGFloat] {
+        let bytes = withUnsafeBytes(of: id.uuid) { Array($0) }
+        let count = 10
+        return (0..<count).map { index in
+            let a = bytes[index % bytes.count]
+            let b = bytes[(index + 7) % bytes.count]
+            let mixed = (UInt16(a) + UInt16(b)) % 256
+            return CGFloat(0.28 + Double(mixed) / 255.0 * 0.67)
+        }
+    }
+}

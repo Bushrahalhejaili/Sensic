@@ -5,14 +5,14 @@
 
 import SwiftUI
 
-// MARK: - Swipe row (Rename · Move · Delete)
+// MARK: - Swipe row (Rename · Move · Remove)
 
 struct AlbumRecordingSwipeRow: View {
     let recording: RecordingItem
     @Binding var revealedRecordingID: UUID?
     var onRename: () -> Void = {}
     var onMove: () -> Void = {}
-    var onDelete: () -> Void = {}
+    var onRemove: () -> Void = {}
     var onDetail: () -> Void = {}
 
     private var actionsRevealWidth: CGFloat { RecordingSwipeActionMetrics.totalRevealWidth }
@@ -45,13 +45,14 @@ struct AlbumRecordingSwipeRow: View {
                     action: onMove
                 )
                 RecordingSwipeAction(
-                    title: "Delete",
+                    title: "Remove",
                     icon: "trash",
                     background: Color("RecordingRed"),
-                    action: onDelete
+                    action: onRemove
                 )
             }
             .frame(maxHeight: .infinity, alignment: .center)
+            .allowsHitTesting(isRevealed)
 
             AlbumRecordingCardView(recording: recording)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -66,8 +67,8 @@ struct AlbumRecordingSwipeRow: View {
                 }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: AlbumRecordingMetrics.rowHeight)
-        .clipShape(RoundedRectangle(cornerRadius: AlbumRecordingMetrics.cornerRadius, style: .continuous))
+        .frame(height: RecordingsPanelMetrics.rowHeight)
+        .clipShape(RoundedRectangle(cornerRadius: RecordingsPanelMetrics.innerCornerRadius, style: .continuous))
         .animation(.spring(response: 0.35, dampingFraction: 0.82), value: isRevealed)
         .animation(.spring(response: 0.35, dampingFraction: 0.82), value: dragOffset)
     }
@@ -112,51 +113,17 @@ struct AlbumRecordingSwipeRow: View {
 
 // MARK: - Card
 
-private enum AlbumRecordingMetrics {
-    static let cornerRadius: CGFloat = 30
-    static let rowHeight: CGFloat = 105
-}
-
 struct AlbumRecordingCardView: View {
     let recording: RecordingItem
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(recording.title)
-                    .font(.system(size: 22, weight: .medium))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-
-                Spacer(minLength: 8)
-
-                Text(recording.date)
-                    .font(.system(size: 14))
-                    .foregroundStyle(.gray)
-            }
-
-            HStack(spacing: 10) {
-                Image(systemName: "waveform")
-                    .foregroundStyle(.white)
-
-                Text(recording.duration)
-                    .foregroundStyle(.gray)
-            }
-        }
-        .padding(.horizontal, 22)
-        .frame(maxWidth: .infinity, minHeight: AlbumRecordingMetrics.rowHeight, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: AlbumRecordingMetrics.cornerRadius, style: .continuous)
-                .fill(
-                    Color(
-                        red: 16 / 255,
-                        green: 22 / 255,
-                        blue: 58 / 255
-                    )
-                )
-        )
+        RecordingItemCardContent(recording: recording)
+            .padding(RecordingCardLayout.cardInsets)
+            .frame(maxWidth: .infinity, minHeight: RecordingCardLayout.cardMinHeight, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: RecordingsPanelMetrics.innerCornerRadius, style: .continuous)
+                    .fill(Color("SpaceBlue"))
+            )
     }
 }
-
-
 

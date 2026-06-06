@@ -39,7 +39,13 @@ struct HomeView: View {
         _recordingsViewModel = State(initialValue: RecordingsViewModel(store: store))
     }
 
+    private var homeRecentRecordings: [Piece] {
+        HomeViewModel.recentRecordings(from: store.pieces)
+    }
+
     var body: some View {
+        @Bindable var viewModel = viewModel
+
         NavigationStack(path: $navigationPath) {
             ZStack {
                 Color.black
@@ -136,7 +142,7 @@ struct HomeView: View {
             }
 
             .alert(
-                "Delete recording?",
+                "Permanently delete recording?",
                 isPresented: Binding(
                     get: { viewModel.piecePendingDelete != nil },
                     set: {
@@ -149,7 +155,10 @@ struct HomeView: View {
             ) { piece in
 
                 Button("Delete", role: .destructive) {
-                    viewModel.deletePiece(id: piece.id, albumsStore: albumsStore)
+                    store.permanentlyDeleteRecording(id: piece.id, albumsStore: albumsStore)
+                    if viewModel.revealedRecordingID == piece.id {
+                        viewModel.revealedRecordingID = nil
+                    }
                     viewModel.piecePendingDelete = nil
                 }
 
@@ -159,7 +168,7 @@ struct HomeView: View {
 
             } message: { piece in
 
-                Text("“\(piece.title)” will be removed from your library.")
+                Text("“\(piece.title)” will be permanently deleted from your library. This cannot be undone.")
             }
 
             .task {
@@ -192,13 +201,6 @@ struct HomeView: View {
 
     private func handleAddToAlbum(_ piece: Piece) {
         viewModel.revealedRecordingID = nil
-
-        guard albumsStore.hasAlbums else {
-            albumsStore.shouldPresentCreateOnAlbumsAppear = true
-            openAlbums()
-            return
-        }
-
         albumsStore.syncWithLibrary(validPieceIDs: Set(store.pieces.map(\.id)))
         pieceToAddToAlbum = piece
     }
@@ -251,12 +253,14 @@ struct HomeView: View {
                                     openPiece(piece)
                                 },
                                 onRename: {
+                                    viewModel.revealedRecordingID = nil
                                     viewModel.piecePendingRename = piece
                                 },
                                 onAdd: {
                                     handleAddToAlbum(piece)
                                 },
                                 onDelete: {
+                                    viewModel.revealedRecordingID = nil
                                     viewModel.piecePendingDelete = piece
                                 }
                             )
@@ -274,8 +278,8 @@ struct HomeView: View {
         .frame(maxWidth: .infinity)
         .frame(
             height: RecordingsPanelMetrics.panelHeight(
-                rowCount: viewModel.recentRecordings.count,
-                isEmpty: !viewModel.hasRecentRecordings
+                rowCount: homeRecentRecordings.count,
+                isEmpty: homeRecentRecordings.isEmpty
             )
         )
         .background(

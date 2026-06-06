@@ -175,6 +175,58 @@ struct EnterNameGlassAlert: View {
 }
 
 // ─────────────────────────────────────────────
+// MARK: - SensicSearchBar
+// ─────────────────────────────────────────────
+
+/// Shared pill search field — frosted glass capsule (Albums + Recordings).
+struct SensicSearchBar: View {
+    @Binding var text: String
+    /// Muted icons for sheet contexts (Add recordings, Add to album).
+    var usesMutedIcons: Bool = false
+
+    private var iconColor: Color {
+        usesMutedIcons ? Color("tertiary") : .white
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(iconColor)
+
+            TextField(
+                "",
+                text: $text,
+                prompt: Text("Search").foregroundStyle(Color("tertiary"))
+            )
+            .foregroundStyle(.white)
+            .autocorrectionDisabled()
+
+            Spacer(minLength: 0)
+
+            Image(systemName: "mic.fill")
+                .foregroundStyle(iconColor)
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 50)
+        .glassEffect(in: .capsule)
+        .overlay(
+            Capsule(style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.22),
+                            Color.white.opacity(0.06),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1
+                )
+        )
+    }
+}
+
+// ─────────────────────────────────────────────
 // MARK: - SensicGlassTransportBar
 // ─────────────────────────────────────────────
 

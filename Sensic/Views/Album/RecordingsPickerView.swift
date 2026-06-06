@@ -2,10 +2,6 @@
 //  RecordingsPickerView.swift
 //  Sensic
 //
-//
-//  RecordingsPickerView.swift
-//  Sensic
-//
 
 import SwiftUI
 
@@ -22,19 +18,40 @@ struct RecordingsPickerView: View {
     @State private var searchText = ""
     @State private var selectedRecordings: Set<UUID> = []
 
+    private enum Layout {
+        static let horizontalPadding: CGFloat = 18
+        static let cardCornerRadius: CGFloat = 28
+        static let searchToListSpacing: CGFloat = 16
+        static let headerToSearchSpacing: CGFloat = 14
+        static let searchBarHeight: CGFloat = 44
+        static let cardMinHeight: CGFloat = 78
+        static let cardHorizontalPadding: CGFloat = 18
+        static let cardVerticalPadding: CGFloat = 12
+        static let cardInnerSpacing: CGFloat = 10
+        static let rowDividerSpacing: CGFloat = 12
+        static let addButtonSize: CGFloat = 22
+        static let waveformBarCount: Int = 16
+        static let waveformLaneWidth: CGFloat = 70
+        static let waveformLaneHeight: CGFloat = 14
+    }
+
     var body: some View {
         ZStack {
             Color.black
                 .ignoresSafeArea()
 
-            VStack(spacing: 22) {
+            VStack(spacing: 0) {
                 topBar
                 searchBar
+                    .padding(.top, Layout.headerToSearchSpacing)
                 recordingsList
+                    .padding(.top, Layout.searchToListSpacing)
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, Layout.horizontalPadding)
             .padding(.top, 14)
         }
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(28)
     }
 }
 
@@ -44,13 +61,7 @@ extension RecordingsPickerView {
 
     private var topBar: some View {
         HStack {
-            glassCircleButton(
-                icon: "xmark",
-                iconSize: 18,
-                iconColor: .white
-            ) {
-                dismiss()
-            }
+            closeButton
 
             Spacer()
 
@@ -70,59 +81,86 @@ extension RecordingsPickerView {
 
             Spacer()
 
-            purpleCircleButton {
+            Button {
                 let selectedItems = recordings.filter { selectedRecordings.contains($0.id) }
                 onSave(selectedItems)
                 dismiss()
+            } label: {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(Color("MainPurple")))
+                    .contentShape(Circle())
             }
+            .buttonStyle(.plain)
         }
     }
 
+    /// Solid dark pill — matches Figma (not the glass search on Albums/Recordings pages).
     private var searchBar: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(.gray)
+                .foregroundStyle(Color("tertiary"))
 
-            TextField("Search", text: $searchText)
-                .foregroundStyle(.white)
+            TextField(
+                "",
+                text: $searchText,
+                prompt: Text("Search").foregroundStyle(Color("tertiary"))
+            )
+            .foregroundStyle(.white)
+            .autocorrectionDisabled()
 
-            Spacer()
+            Spacer(minLength: 0)
 
             Image(systemName: "mic.fill")
-                .foregroundStyle(.white.opacity(0.8))
+                .foregroundStyle(Color("tertiary"))
         }
         .padding(.horizontal, 16)
-        .frame(height: 52)
+        .frame(height: Layout.searchBarHeight)
         .background(
-            Capsule()
+            Capsule(style: .continuous)
                 .fill(Color.white.opacity(0.12))
         )
     }
 
+    private var closeButton: some View {
+        Button(action: { dismiss() }) {
+            Image(systemName: "xmark")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(Color("SpaceBlue")))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+    }
+
     private var recordingsList: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 2) {
-                ForEach(filteredRecordings) { recording in
-                    VStack(spacing: 16) {
-                        recordingCard(recording)
-                        Rectangle()
-                            .fill(Color.white.opacity(0.08))
-                            .frame(height: 1)
+            VStack(spacing: 0) {
+                ForEach(Array(filteredRecordings.enumerated()), id: \.element.id) { index, recording in
+                    if index > 0 {
+                        rowDivider
                     }
+                    recordingRow(recording)
                 }
             }
-            .padding(.top, 4)
             .padding(.bottom, 20)
         }
     }
 
+    private var rowDivider: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.08))
+            .frame(height: 1)
+            .padding(.vertical, Layout.rowDividerSpacing)
+    }
+
     private var filteredRecordings: [RecordingItem] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-
         let all = recordings
-
         guard !query.isEmpty else { return all }
-
         return all.filter {
             $0.title.localizedCaseInsensitiveContains(query)
             || $0.duration.localizedCaseInsensitiveContains(query)
@@ -130,38 +168,53 @@ extension RecordingsPickerView {
         }
     }
 
-    private func recordingCard(_ recording: RecordingItem) -> some View {
+    private func recordingRow(_ recording: RecordingItem) -> some View {
         let isSelected = selectedRecordings.contains(recording.id)
 
         return HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
+            VStack(alignment: .leading, spacing: Layout.cardInnerSpacing) {
+                HStack(alignment: .firstTextBaseline) {
                     Text(recording.title)
-                        .font(.system(size: 22, weight: .medium))
+                        .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.white)
+                        .lineLimit(1)
 
-                    Spacer()
+                    Spacer(minLength: 8)
 
                     Text(recording.date)
-                        .font(.system(size: 14))
-                        .foregroundStyle(.gray.opacity(0.9))
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color("tertiary"))
                 }
 
-                HStack(spacing: 10) {
-                    Image(systemName: "waveform")
-                        .foregroundStyle(.white.opacity(0.9))
+                HStack(spacing: 8) {
+                    WaveformBarsView(
+                        barColor: .white.opacity(0.9),
+                        heights: pickerWaveformHeights(for: recording),
+                        maxBarHeight: 12,
+                        barWidth: 2.5,
+                        spacing: 2
+                    )
+                    .frame(
+                        width: Layout.waveformLaneWidth,
+                        height: Layout.waveformLaneHeight,
+                        alignment: .leading
+                    )
 
                     Text(recording.duration)
-                        .font(.system(size: 15))
-                        .foregroundStyle(.gray)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color("tertiary"))
                 }
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 14)
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, Layout.cardHorizontalPadding)
+            .padding(.vertical, Layout.cardVerticalPadding)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: Layout.cardMinHeight,
+                alignment: .leading
+            )
             .background(
-                RoundedRectangle(cornerRadius: 28)
-                    .fill(Color(red: 16/255, green: 22/255, blue: 58/255))
+                RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous)
+                    .fill(Color("SpaceBlue"))
             )
 
             Button {
@@ -169,19 +222,12 @@ extension RecordingsPickerView {
             } label: {
                 ZStack {
                     Circle()
-                        .stroke(
-                            isSelected
-                            ? Color("MainPurple")
-                            : Color("MainPurple"),
-                            lineWidth: 2
-                        )
-                        .frame(width: 20, height: 20)
+                        .stroke(Color("MainPurple"), lineWidth: 2)
+                        .frame(width: Layout.addButtonSize, height: Layout.addButtonSize)
 
                     Image(systemName: isSelected ? "checkmark" : "plus")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(
-                            isSelected ? Color("MainPurple") : Color("MainPurple")
-                        )
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Color("MainPurple"))
                 }
             }
             .buttonStyle(.plain)
@@ -200,48 +246,12 @@ extension RecordingsPickerView {
             selectedRecordings.insert(recording.id)
         }
     }
-}
 
-// MARK: - Actions
-
-extension RecordingsPickerView {
-
-    private func glassCircleButton(
-        icon: String,
-        iconSize: CGFloat,
-        iconColor: Color = .white,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: iconSize, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
-                .background(
-                    Circle()
-                        .fill(Color("SpaceBlue"))
-                )
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
+    private func pickerWaveformHeights(for recording: RecordingItem) -> [CGFloat] {
+        let base = recording.waveformHeights
+        return (0..<Layout.waveformBarCount).map { base[$0 % base.count] }
     }
 
-    private func purpleCircleButton(
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: "checkmark")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
-                .background(
-                    Circle()
-                        .fill(Color("MainPurple"))
-                )
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-    }
 }
 
 // MARK: - Preview

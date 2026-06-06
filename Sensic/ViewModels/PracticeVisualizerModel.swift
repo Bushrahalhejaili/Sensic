@@ -113,13 +113,12 @@ final class PracticeVisualizerModel: ObservableObject {
 
         // Bell curve مركزها C4 (midi 60)
         let center: Double = 60.0
-        let spread: Double = 28.0   // ← كبّري لتوسيع القمة
+        let spread: Double = 28.0
         let normalized = Double(midi) - center
         let bellShape = exp(-(normalized * normalized) / (2 * spread * spread))
-        // bellShape: 1.0 عند C4، ~0.15 عند الأطراف
 
         let minRows: Double = 2.0
-        let maxRows: Double = Double(activeRowCount)   // 10
+        let maxRows: Double = Double(activeRowCount)
         let maxFill = minRows + bellShape * (maxRows - minRows)
 
         let fromVelocity = velocityCurve * maxFill * 0.7
@@ -156,6 +155,4 @@ final class PracticeVisualizerModel: ObservableObject {
         return nil
     }
 }
-
-
 

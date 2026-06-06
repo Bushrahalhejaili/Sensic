@@ -146,22 +146,24 @@ struct RecordingsSwipeRow: View {
                     title: "Rename",
                     icon: "pencil",
                     background: Color("IndigoBlue"),
-                    action: onRename
+                    action: { performAction(onRename) }
                 )
                 RecordingSwipeAction(
-                    title: "Move",
+                    title: "Add",
                     icon: "folder",
                     background: Color("MainPurple"),
-                    action: onAdd
+                    action: { performAction(onAdd) }
                 )
                 RecordingSwipeAction(
                     title: "Delete",
                     icon: "trash",
                     background: Color("RecordingRed"),
-                    action: onDelete
+                    action: { performAction(onDelete) }
                 )
             }
             .frame(maxHeight: .infinity, alignment: .center)
+            .zIndex(isRevealed ? 2 : 0)
+            .allowsHitTesting(isRevealed)
 
             RecordingsCardView(piece: piece, primaryAlbumName: primaryAlbumName)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -178,6 +180,7 @@ struct RecordingsSwipeRow: View {
                     }
                 }
                 .gesture(swipeGesture)
+                .zIndex(1)
         }
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: RecordingsPanelMetrics.cornerRadius, style: .continuous))
@@ -221,6 +224,13 @@ struct RecordingsSwipeRow: View {
                 }
             }
     }
+
+    private func performAction(_ action: () -> Void) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+            revealedRecordingID = nil
+        }
+        action()
+    }
 }
 
 struct RecordingsCardView: View {
@@ -244,20 +254,7 @@ struct RecordingsSearchBar: View {
     @Binding var text: String
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(Color("tertiary"))
-
-            TextField("Search", text: $text)
-                .foregroundStyle(.white)
-                .autocorrectionDisabled()
-
-            Image(systemName: "mic.fill")
-                .foregroundStyle(Color("tertiary"))
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .glassEffect(in: .rect(cornerRadius: 16))
+        SensicSearchBar(text: $text)
     }
 }
 

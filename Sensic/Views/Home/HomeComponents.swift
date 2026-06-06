@@ -332,22 +332,24 @@ struct SwipeableRecordingRow: View {
                     title: "Rename",
                     icon: "pencil",
                     background: Color("IndigoBlue"),
-                    action: onRename
+                    action: { performAction(onRename) }
                 )
                 RecordingSwipeAction(
                     title: "Add",
                     icon: "folder",
                     background: Color("MainPurple"),
-                    action: onAdd
+                    action: { performAction(onAdd) }
                 )
                 RecordingSwipeAction(
                     title: "Delete",
                     icon: "trash",
                     background: Color("RecordingRed"),
-                    action: onDelete
+                    action: { performAction(onDelete) }
                 )
             }
             .frame(maxHeight: .infinity, alignment: .center)
+            .zIndex(isRevealed ? 2 : 0)
+            .allowsHitTesting(isRevealed)
 
             RecordingRowView(piece: piece, primaryAlbumName: primaryAlbumName)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -366,6 +368,7 @@ struct SwipeableRecordingRow: View {
                     }
                 }
                 .gesture(swipeGesture)
+                .zIndex(1)
         }
         .frame(maxWidth: .infinity)
         .frame(height: RecordingsPanelMetrics.rowHeight)
@@ -410,6 +413,13 @@ struct SwipeableRecordingRow: View {
                 }
             }
     }
+
+    private func performAction(_ action: () -> Void) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+            revealedRecordingID = nil
+        }
+        action()
+    }
 }
 
 struct RecordingSwipeAction: View {
@@ -438,10 +448,6 @@ struct RecordingSwipeAction: View {
                 alignment: .center
             )
             .background(background, in: Capsule(style: .continuous))
-            .overlay(
-                Capsule(style: .continuous)
-                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
-            )
         }
         .buttonStyle(.plain)
     }

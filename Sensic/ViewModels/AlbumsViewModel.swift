@@ -70,6 +70,7 @@ final class AlbumsViewModel {
         return true
     }
 
+    /// Removes a recording from this album only — the piece stays in the library.
     func removeRecording(id: UUID, fromAlbumID albumID: UUID) {
         albumsStore.removePiece(id: id, fromAlbumID: albumID)
     }

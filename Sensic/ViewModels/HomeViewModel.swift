@@ -29,9 +29,13 @@ final class HomeViewModel {
     private let homeRecordingsPreviewLimit = 4
 
     var recentRecordings: [Piece] {
+        Self.recentRecordings(from: store.pieces, limit: homeRecordingsPreviewLimit)
+    }
+
+    static func recentRecordings(from pieces: [Piece], limit: Int = 4) -> [Piece] {
         let calendar = Calendar.current
         let now = Date()
-        let inLastSevenDays = store.pieces.filter { piece in
+        let inLastSevenDays = pieces.filter { piece in
             let days = calendar.dateComponents(
                 [.day],
                 from: calendar.startOfDay(for: piece.createdAt),
@@ -42,7 +46,7 @@ final class HomeViewModel {
         return Array(
             inLastSevenDays
                 .sorted { $0.createdAt > $1.createdAt }
-                .prefix(homeRecordingsPreviewLimit)
+                .prefix(limit)
         )
     }
 
@@ -74,8 +78,7 @@ final class HomeViewModel {
     }
 
     func deletePiece(id: UUID, albumsStore: AlbumsStore) {
-        store.deletePiece(id: id)
-        albumsStore.removePieceFromAllAlbums(id)
+        store.permanentlyDeleteRecording(id: id, albumsStore: albumsStore)
         if revealedRecordingID == id {
             revealedRecordingID = nil
         }

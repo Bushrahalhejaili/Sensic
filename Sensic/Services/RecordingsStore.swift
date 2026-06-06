@@ -56,6 +56,14 @@ final class RecordingsStore {
         persist()
     }
 
+    /// Permanently deletes a recording from the library (not just an album).
+    func permanentlyDeleteRecording(id: UUID, albumsStore: AlbumsStore) {
+        guard pieces.contains(where: { $0.id == id }) else { return }
+        deletePiece(id: id)
+        albumsStore.removePieceFromAllAlbums(id)
+        showToast("Recording deleted")
+    }
+
     @discardableResult
     func savePiece(title: String,
                    duration: TimeInterval,

@@ -71,9 +71,15 @@ struct RecordingsView: View {
                                     albumsStore: albumsStore,
                                     revealedRecordingID: $viewModel.revealedRecordingID,
                                     onOpen:   { onOpenPiece?($0) },
-                                    onRename: { viewModel.piecePendingRename = $0 },
-                                    onAdd:    { handleAddToAlbum($0) },
-                                    onDelete: { viewModel.piecePendingDelete = $0 }
+                                    onRename: { piece in
+                                        viewModel.revealedRecordingID = nil
+                                        viewModel.piecePendingRename = piece
+                                    },
+                                    onAdd: { handleAddToAlbum($0) },
+                                    onDelete: { piece in
+                                        viewModel.revealedRecordingID = nil
+                                        viewModel.piecePendingDelete = piece
+                                    }
                                 )
                             }
                         }
@@ -139,7 +145,7 @@ struct RecordingsView: View {
             )
         }
         .alert(
-            "Delete recording?",
+            "Permanently delete recording?",
             isPresented: Binding(
                 get: { viewModel.piecePendingDelete != nil },
                 set: { if !$0 { viewModel.piecePendingDelete = nil } }
@@ -147,26 +153,23 @@ struct RecordingsView: View {
             presenting: viewModel.piecePendingDelete
         ) { piece in
             Button("Delete", role: .destructive) {
-                viewModel.deletePiece(id: piece.id, albumsStore: albumsStore)
+                store.permanentlyDeleteRecording(id: piece.id, albumsStore: albumsStore)
+                if viewModel.revealedRecordingID == piece.id {
+                    viewModel.revealedRecordingID = nil
+                }
                 viewModel.piecePendingDelete = nil
             }
             Button("Cancel", role: .cancel) {
                 viewModel.piecePendingDelete = nil
             }
         } message: { piece in
-            Text("“\(piece.title)” will be removed from your library.")
+            Text("“\(piece.title)” will be permanently deleted from your library. This cannot be undone.")
         }
         .animation(.easeInOut(duration: 0.25), value: viewModel.toastMessage)
     }
 
     private func handleAddToAlbum(_ piece: Piece) {
         viewModel.revealedRecordingID = nil
-
-        guard albumsStore.hasAlbums else {
-            store.showToast("Create an album first")
-            return
-        }
-
         albumsStore.syncWithLibrary(validPieceIDs: Set(store.pieces.map(\.id)))
         pieceToAddToAlbum = piece
     }
