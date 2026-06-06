@@ -26,7 +26,7 @@ struct AddToAlbumPickerView: View {
                 if let errorMessage {
                     Text(errorMessage)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Color("RecordingRed"))
+                        .foregroundStyle(Color("MainPurple"))
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity)
                 }
@@ -171,9 +171,7 @@ struct AddToAlbumPickerView: View {
                     ZStack {
                         Circle()
                             .stroke(
-                                isSelected
-                                ? Color(red: 170 / 255, green: 102 / 255, blue: 255 / 255)
-                                : Color.purple.opacity(0.45),
+                                isSelected ? Color("MainPurple") : Color("MainPurple"),
                                 lineWidth: 2
                             )
                             .frame(width: 20, height: 20)
@@ -181,7 +179,7 @@ struct AddToAlbumPickerView: View {
                         Image(systemName: isSelected ? "checkmark" : "plus")
                             .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(
-                                isSelected ? Color("MainPurple") : Color.purple.opacity(0.8)
+                                isSelected ? Color("MainPurple") : Color("MainPurple")
                             )
                     }
                 }

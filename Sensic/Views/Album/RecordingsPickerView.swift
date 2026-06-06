@@ -171,8 +171,8 @@ extension RecordingsPickerView {
                     Circle()
                         .stroke(
                             isSelected
-                            ? Color(red: 170/255, green: 102/255, blue: 255/255)
-                            : Color.purple.opacity(0.45),
+                            ? Color("MainPurple")
+                            : Color("MainPurple"),
                             lineWidth: 2
                         )
                         .frame(width: 20, height: 20)
@@ -180,7 +180,7 @@ extension RecordingsPickerView {
                     Image(systemName: isSelected ? "checkmark" : "plus")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(
-                            isSelected ? Color("MainPurple") : Color.purple.opacity(0.8)
+                            isSelected ? Color("MainPurple") : Color("MainPurple")
                         )
                 }
             }

@@ -157,18 +157,13 @@ extension AlbumDetailsView {
 
         HStack {
 
-            // Back
-
-            Button {
-
+            // Back button (unified style) with white icon
+            SensicGlassCircleButton(
+                systemName: "chevron.left",
+                iconSize: 16,
+                iconColor: .white
+            ) {
                 dismiss()
-
-            } label: {
-
-                glassButton(
-                    icon: "chevron.left",
-                    color: .white
-                )
             }
 
             Spacer()
@@ -176,23 +171,17 @@ extension AlbumDetailsView {
             HStack(spacing: 12) {
 
                 // Add Recordings
-
-                Button {
-
+                SensicGlassCircleButton(systemName: "plus") {
                     showRecordingsPicker = true
-
-                } label: {
-
-                    glassButton(
-                        icon: "plus",
-                        color: Color("MainPurple")
-                    )
                 }
 
                 // Edit / Save
-
-                Button {
-
+                SensicGlassCircleButton(
+                    systemName: isEditingTitle ? "checkmark" : "pencil",
+                    iconSize: 16,
+                    iconColor: isEditingTitle ? .white : Color("MainPurple"),
+                    isActive: isEditingTitle
+                ) {
                     if isEditingTitle {
                         vm.updateAlbumName(id: albumID, newName: albumName)
                     }
@@ -202,21 +191,11 @@ extension AlbumDetailsView {
                     }
 
                     isTextFieldFocused = false
-
-                } label: {
-
-                    glassButton(
-                        icon: isEditingTitle ? "checkmark" : "pencil",
-                        color: isEditingTitle ? .white : Color("MainPurple"),
-                        backgroundColor: isEditingTitle
-                            ? Color(red: 170/255, green: 110/255, blue: 205/255)
-                            : Color.black.opacity(0.25)
-                    )
-                
                 }
             }
         }
     }
+
     private var titleSection: some View {
 
         VStack(
