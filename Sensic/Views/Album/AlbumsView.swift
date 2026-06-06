@@ -80,42 +80,21 @@ extension AlbumsView {
     private var topBar: some View {
 
         HStack {
-
-            Button {
-
-                dismiss()
-
-            } label: {
-
-                Circle()
-                    .fill(Color("Navy"))
-                    .frame(width: 42, height: 42)
-                    .overlay {
-
-                        Image(systemName: "chevron.left")
-                            .foregroundStyle(.white)
-                            .font(.system(size: 16, weight: .semibold))
-                    }
-            }
+            SensicGlassCircleButton(
+                systemName: "chevron.left",
+                iconSize: 16,
+                iconColor: .white,
+                action: { dismiss() }
+            )
 
             Spacer()
 
-            Button {
-
-                vm.showCreateAlbum = true
-
-            } label: {
-
-                Circle()
-                    .fill(Color("Navy"))
-                    .frame(width: 42, height: 42)
-                    .overlay {
-
-                        Image(systemName: "plus")
-                            .foregroundStyle(Color("MainPurple"))
-                            .font(.system(size: 18, weight: .bold))
-                    }
-            }
+            SensicGlassCircleButton(
+                systemName: "plus",
+                iconSize: 18,
+                iconColor: Color("MainPurple"),
+                action: { vm.showCreateAlbum = true }
+            )
         }
     }
 
@@ -251,5 +230,3 @@ extension AlbumsView {
 #Preview {
     AlbumsView()
 }
-
-
