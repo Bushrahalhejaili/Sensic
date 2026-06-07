@@ -10,6 +10,18 @@
 //
 
 
+//
+//  PianoKeyboard.swift
+//  Sensic
+//
+//  Created by Bushra Hatim Alhejaili on 31/05/2026.
+//
+//  The piano keyboard surface — keys, scroller strip, and the
+//  combined keyboard-plus-scroller view. Shared between Record
+//  mode (in CreationView) and Practice mode.
+//
+
+
 import SwiftUI
 import UIKit
 
@@ -241,9 +253,16 @@ struct PianoSection: UIViewRepresentable {
         scroll.showsHorizontalScrollIndicator = false
         scroll.showsVerticalScrollIndicator = false
         scroll.backgroundColor = .clear
-        // Let a horizontal drag cancel the touch on a key and start scrolling.
-        scroll.canCancelContentTouches = true
-        scroll.delaysContentTouches = false
+        // Disable user-initiated scrolling on the main piano
+        // entirely.  The PianoScroller strip above is the only
+        // intended way for the user to move the keyboard
+        // horizontally — letting both surfaces drive scrolling
+        // caused chords on the piano to slide out from under the
+        // user when a finger drifted sideways.  Programmatic
+        // scrolling via `scrollState.setOffset` → `setContentOffset`
+        // is unaffected by this flag, so the PianoScroller still
+        // controls the position normally.
+        scroll.isScrollEnabled = false
         scroll.delegate = context.coordinator
         scroll.addSubview(piano)
         scroll.contentSize = CGSize(width: totalW, height: wKH)

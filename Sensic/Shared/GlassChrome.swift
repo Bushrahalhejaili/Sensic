@@ -9,6 +9,19 @@
 //  visual primitive in this style goes here.
 //
 
+
+
+//
+//  GlassChrome.swift
+//  Sensic
+//
+//  Created by Bushra Hatim Alhejaili on 31/05/2026.
+//
+//  Shared glass-style chrome widgets used across the Creation,
+//  Home, and Recordings pages. Naming convention: any new shared
+//  visual primitive in this style goes here.
+//
+
 import SwiftUI
 
 // ─────────────────────────────────────────────
@@ -103,76 +116,14 @@ struct SensicGlassSegmentPicker<Tab: Hashable>: View {
     }
 }
 
-// ─────────────────────────────────────────────
-// MARK: - EnterNameGlassAlert
-// ─────────────────────────────────────────────
+// (SensicNameAlert previously lived here.  It's been deleted in
+// favor of the native `.alert(_:isPresented:actions:message:)`
+// SwiftUI modifier — on iOS 26 that already applies Liquid Glass,
+// the correct backdrop, keyboard avoidance, and return-to-submit
+// behavior.  Rebuilding all of that as a custom view was just
+// reinventing what the system gives you for free.)
 
-struct EnterNameGlassAlert: View {
-    @Binding var title: String
-    let onSave: () -> Void
-    let onCancel: () -> Void
 
-    private var canSave: Bool {
-        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    var body: some View {
-        VStack(spacing: 22) {
-            Text("Enter New Name")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(.white)
-
-            TextField("", text: $title, prompt: Text("Punisher").foregroundStyle(.white.opacity(0.45)))
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
-                .background(
-                    Capsule()
-                        .fill(Color.white.opacity(0.12))
-                )
-                .overlay(
-                    Capsule()
-                        .stroke(Color.white.opacity(0.18), lineWidth: 1)
-                )
-
-            HStack(spacing: 14) {
-                glassPillButton("Cancel", action: onCancel)
-                glassPillButton("Save", action: onSave)
-                    .opacity(canSave ? 1 : 0.45)
-                    .disabled(!canSave)
-            }
-        }
-        .padding(.horizontal, 22)
-        .padding(.vertical, 26)
-        .frame(maxWidth: 360)
-        .glassEffect(in: .rect(cornerRadius: 28))
-        .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .stroke(Color.white.opacity(0.16), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.45), radius: 24, y: 12)
-    }
-
-    private func glassPillButton(_ label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(label)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-        }
-        .buttonStyle(.plain)
-        .background(
-            Capsule()
-                .fill(Color.white.opacity(0.12))
-        )
-        .overlay(
-            Capsule()
-                .stroke(Color.white.opacity(0.14), lineWidth: 1)
-        )
-    }
-}
 
 // ─────────────────────────────────────────────
 // MARK: - SensicGlassTransportBar

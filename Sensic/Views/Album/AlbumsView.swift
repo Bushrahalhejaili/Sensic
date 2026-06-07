@@ -4,6 +4,25 @@
 //
 
 
+//
+//  AlbumsView.swift
+//  Sensic
+//
+
+
+
+//
+//  AlbumsView.swift
+//  Sensic
+//
+
+
+//
+//  AlbumsView.swift
+//  Sensic
+//
+
+
 import SwiftUI
 import Observation
 
@@ -28,7 +47,14 @@ struct AlbumsView: View {
     }
     
     var body: some View {
-        
+
+        // iOS 17+ body-local Bindable proxy.  Lets us write
+        // `$vm.showCreateAlbum` and `$vm.albumName` as proper
+        // Bindings even though `vm` is held as @State (which
+        // doesn't give you `$`-access directly on @Observable
+        // properties).
+        @Bindable var vm = vm
+
             ZStack {
                 
                 Color.black
@@ -51,17 +77,35 @@ struct AlbumsView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 10)
                 .padding(.bottom, 8)
-                
-                // Popup
-                if vm.showCreateAlbum {
-                    
-                    CreateAlbumView(vm: vm)
-                        .frame(maxWidth: 380)
-                        .transition(.scale.combined(with: .opacity))
-                        .zIndex(1)
-                }
             }
-            .animation(.easeInOut(duration: 0.2), value: vm.showCreateAlbum)
+            // Same reasoning as in CreationView: keep the albums
+            // grid and search bar anchored to the screen edges
+            // when the keyboard appears for the alert's text
+            // field, rather than letting the layout shift up.  The
+            // alert itself still handles its own keyboard
+            // avoidance; this only affects the content underneath.
+            .ignoresSafeArea(.keyboard, edges: .bottom)
+            // Create-album alert — uses the native iOS alert,
+            // which on iOS 26 renders with Liquid Glass, the right
+            // backdrop, focus, and keyboard avoidance.  Same API
+            // used in CreationView, so both views automatically
+            // stay visually consistent.
+            .alert("Name Album", isPresented: $vm.showCreateAlbum) {
+                TextField("Name", text: $vm.albumName)
+
+                Button("Cancel", role: .cancel) {
+                    vm.albumName = ""
+                }
+
+                Button("Save") {
+                    vm.createAlbum()
+                }
+                .disabled(
+                    vm.albumName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                )
+            } message: {
+                Text("Enter a name for this album.")
+            }
             .navigationBarBackButtonHidden(true)
             .onAppear {
                 if albumsStore.shouldPresentCreateOnAlbumsAppear {
