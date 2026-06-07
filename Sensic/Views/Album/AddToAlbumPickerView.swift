@@ -213,7 +213,7 @@ struct AddToAlbumPickerView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color("MainPurple").opacity(0.35), lineWidth: 1)
+                .stroke(Color("tertiary").opacity(0.35), lineWidth: 1)
         )
         // Make the whole card tappable to toggle selection
         .contentShape(Rectangle())
