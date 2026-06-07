@@ -90,41 +90,53 @@ struct AddToAlbumPickerView: View {
     }
 
     private var searchBar: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.gray)
-
-            TextField("Search", text: $searchText)
-                .foregroundStyle(.white)
-
-            Spacer()
-
-            Image(systemName: "mic.fill")
-                .foregroundStyle(.white.opacity(0.8))
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 52)
-        .background(
-            Capsule()
-                .fill(Color.white.opacity(0.12))
-        )
+        SensicSearchBar(text: $searchText, usesMutedIcons: true)
     }
 
     private var albumsGrid: some View {
-        ScrollView(showsIndicators: false) {
-            LazyVGrid(
-                columns: [
-                    GridItem(.flexible(), spacing: 14),
-                    GridItem(.flexible(), spacing: 14),
-                ],
-                spacing: 14
-            ) {
-                ForEach(filteredAlbums, id: \.id) { album in
-                    albumCard(album)
+        Group {
+            if albumsStore.albums.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "square.stack")
+                        .font(.system(size: 32, weight: .medium))
+                        .foregroundStyle(Color("tertiary"))
+
+                    Text("No albums yet")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(.white)
+
+                    Text("Create an album from the library to add recordings.")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Color("tertiary"))
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.vertical, 40)
+            } else if filteredAlbums.isEmpty {
+                VStack(spacing: 8) {
+                    Text("No albums match your search")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(Color("tertiary"))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.vertical, 40)
+            } else {
+                ScrollView(showsIndicators: false) {
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(), spacing: 14),
+                            GridItem(.flexible(), spacing: 14),
+                        ],
+                        spacing: 14
+                    ) {
+                        ForEach(filteredAlbums, id: \.id) { album in
+                            albumCard(album)
+                        }
+                    }
+                    .padding(.top, 4)
+                    .padding(.bottom, 20)
                 }
             }
-            .padding(.top, 4)
-            .padding(.bottom, 20)
         }
     }
 
@@ -201,7 +213,7 @@ struct AddToAlbumPickerView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color("MainPurple").opacity(0.35), lineWidth: 1)
+                .stroke(Color("tertiary").opacity(0.35), lineWidth: 1)
         )
         // Make the whole card tappable to toggle selection
         .contentShape(Rectangle())

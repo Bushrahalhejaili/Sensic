@@ -73,7 +73,7 @@ struct AlbumDetailsView: View {
                                         revealedRecordingID = nil
                                         recordingPendingMove = recording
                                     },
-                                    onDelete: {
+                                    onRemove: {
                                         revealedRecordingID = nil
                                         recordingPendingDelete = recording
                                     },
@@ -141,7 +141,7 @@ struct AlbumDetailsView: View {
                 recordingPendingDelete = nil
             }
         } message: { recording in
-            Text("“\(recording.title)” will be removed from this album.")
+            Text("“\(recording.title)” will be removed from this album only. The recording stays in your library.")
         }
         .onAppear {
             albumName = currentAlbum?.name ?? ""

@@ -45,8 +45,7 @@ final class RecordingsViewModel {
     }
 
     func deletePiece(id: UUID, albumsStore: AlbumsStore) {
-        store.deletePiece(id: id)
-        albumsStore.removePieceFromAllAlbums(id)
+        store.permanentlyDeleteRecording(id: id, albumsStore: albumsStore)
         if revealedRecordingID == id {
             revealedRecordingID = nil
         }

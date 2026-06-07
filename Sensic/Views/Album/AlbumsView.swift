@@ -31,6 +31,7 @@ struct AlbumsView: View {
     @Bindable var albumsStore: AlbumsStore
     @Bindable var recordingsStore: RecordingsStore
     @State private var vm: AlbumsViewModel
+    @State private var searchText = ""
 
     init(
         albumsStore: AlbumsStore = .shared,
@@ -243,31 +244,8 @@ extension AlbumsView {
     }
 
     private var searchBar: some View {
-
-        HStack(spacing: 10) {
-
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(Color("tertiary"))
-
-            Text("Search")
-                .foregroundStyle(Color("tertiary"))
-
-            Spacer()
-
-            Image(systemName: "mic")
-                .foregroundStyle(.white)
-        }
-        .padding(.horizontal, 14)
-        .frame(height: 50)
-        .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Color("Navy"))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(Color("MainPurple").opacity(0.35), lineWidth: 1)
-        )
-        .padding(.bottom, 8)
+        SensicSearchBar(text: $searchText)
+            .padding(.bottom, 8)
     }
 }
 
