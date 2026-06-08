@@ -10,28 +10,7 @@
 //
 
 
-//
-//  PianoKeyboard.swift
-//  Sensic
-//
-//  Created by Bushra Hatim Alhejaili on 31/05/2026.
-//
-//  The piano keyboard surface — keys, scroller strip, and the
-//  combined keyboard-plus-scroller view. Shared between Record
-//  mode (in CreationView) and Practice mode.
-//
 
-
-//
-//  PianoKeyboard.swift
-//  Sensic
-//
-//  Created by Bushra Hatim Alhejaili on 31/05/2026.
-//
-//  The piano keyboard surface — keys, scroller strip, and the
-//  combined keyboard-plus-scroller view. Shared between Record
-//  mode (in CreationView) and Practice mode.
-//
 
 
 import SwiftUI

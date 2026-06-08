@@ -4,12 +4,6 @@
 //  Created by Bushra Hatim Alhejaili on 19/05/2026.
 //
 
-//
-//  CreationView.swift
-//  Sensic
-//  Created by Bushra Hatim Alhejaili on 19/05/2026.
-//
-
 import SwiftUI
 import UIKit
 
@@ -167,90 +161,15 @@ struct CreationView: View {
                                  scrollState: scrollState)
                 }
             }
-            // Pinning the VStack to the screen's full bounds with
-            // top alignment is what keeps the header rock-stable
-            // when the landscape timeline animates 39pt → 293pt.
-            // Without this, the VStack sizes to its content and
-            // gets centred inside the ZStack — and as the
-            // workspace's content height changes during the
-            // expand animation, the centring point shifts, which
-            // pulls the whole VStack (header included) up and
-            // down by a few pixels.  Filling maxHeight + .top
-            // alignment fixes the header's y-origin at 0 and
-            // makes the workspace absorb every height change
-            // internally via its own Spacer.
+          
             .frame(maxWidth: .infinity, maxHeight: .infinity,
                    alignment: .top)
-            // Horizontal safe-area opt-out keeps the header's
-            // BUTTON POSITIONS rock-stable when the landscape edit
-            // sheet appears or disappears.  Without this, adding
-            // the edit-sheet view (which itself uses
-            // `.ignoresSafeArea` to extend edge-to-edge) to the
-            // ZStack alters the safe-area context that this
-            // VStack inherits, and the VStack's resolved width
-            // changes — which then redistributes the Spacers in
-            // the header's HStack and shifts the back / save
-            // buttons inward.  Pinning the VStack to the screen's
-            // physical width here makes its width unconditional,
-            // so the buttons' x-positions are determined purely
-            // by the VStack's own `.padding(.horizontal, 16)`
-            // and the landscape header's internal 20pt padding.
-            //
-            // In portrait this is a no-op (horizontal safe-area
-            // insets are 0 on iPhones in portrait orientation).
+            
             .ignoresSafeArea(.container, edges: .horizontal)
-            // Per Apple's `View.ignoresSafeArea(_:edges:)`
-            // documentation, a child view's `ignoresSafeArea`
-            // modifier with explicit regions shadows the parent's
-            // setting for the same edge.  The outer ZStack opts
-            // out of `.keyboard` on the bottom edge, but the inner
-            // VStack is a separate layout container that
-            // arranges its children using its own safe-area
-            // context.  Without this explicit opt-out on the
-            // VStack, it would re-apply the keyboard inset when
-            // distributing space to `headerBar` and
-            // `recordWorkspace`, compressing the layout and
-            // sliding the header up.
-            //
-            // Apple docs:
-            // https://developer.apple.com/documentation/swiftui/view/ignoressafearea(_:edges:)
+           
             .ignoresSafeArea(.keyboard, edges: .bottom)
 
-            // Landscape edit-sheet presentation — drawn as a
-            // direct sibling of the header+workspace VStack
-            // inside the body's ZStack rather than as an overlay
-            // on the workspace.  Two reasons:
-            //
-            //   1. Edge-to-edge: anchoring to the workspace
-            //      didn't work because SwiftUI's `.overlay` is
-            //      laid out within the workspace's *layout*
-            //      bounds even when the workspace draws past
-            //      safe area via `.ignoresSafeArea`.  Attached
-            //      to the ZStack instead, the sheet owns its own
-            //      safe-area context and the `.ignoresSafeArea`
-            //      below it makes it span the full device width
-            //      and extend to the screen bottom.
-            //
-            //   2. Header stability: when the sheet was an
-            //      overlay on the workspace, any layout
-            //      reflow the workspace went through on sheet
-            //      show/hide (timeline 41→90, Spacers and piano
-            //      appearing or disappearing) was animated by
-            //      the `.animation(value: showEditSheet)` on
-            //      the workspace — and that reflow was bleeding
-            //      out to the sibling header, shifting its
-            //      buttons inward by a few pixels.  As a sibling
-            //      of the VStack with its own scoped animation,
-            //      the sheet's appearance can't affect the
-            //      header at all.
-            //
-            // The `if let target = editingRecorder` mirrors the
-            // same hydration pattern the old `.sheet` content
-            // closure used.  The `.transition` slides the panel
-            // up from below; the inline `.animation(...)` on the
-            // transition is what fires the slide animation since
-            // `showEditSheet` is flipped from `MainTimelineView`
-            // (outside this view's `withAnimation` scope).
+           
             if isLandscape && activeTab == .record
                 && showEditSheet, let target = editingRecorder {
                 VStack(spacing: 0) {
@@ -266,17 +185,9 @@ struct CreationView: View {
                 )
             }
         }
-        // Root-level opt-out for the keyboard safe area, per
-        // Apple's canonical pattern for views that should stay
-        // anchored when the keyboard appears.
+        
         .ignoresSafeArea(.keyboard, edges: .bottom)
-        // Save alert — uses the native iOS alert, which on iOS 26
-        // already comes with Liquid Glass, a proper system
-        // backdrop, automatic keyboard avoidance, and return-key
-        // submit behavior.  An earlier version rebuilt all of
-        // this as a custom view with manual `glassEffect` calls
-        // and a hand-rolled dim layer; the native API does it
-        // better and matches the design exactly.
+        
         .alert("Name Recording", isPresented: $showSaveAlert) {
             TextField("Name", text: $saveTitle)
 
@@ -669,31 +580,11 @@ struct CreationView: View {
             }
         } label: {
             Text(title)
-                // Use a semantic text style (`.subheadline`)
-                // rather than a fixed `.system(size: 15)` so the
-                // label scales with the user's Dynamic Type
-                // setting — both the normal range under Settings
-                // → Display & Brightness → Text Size and the
-                // larger range under Accessibility → Display &
-                // Text Size → Larger Text.  `.subheadline` is
-                // 15pt at the system default, so the visual size
-                // at the default setting is unchanged.
-                //
-                // Apple HIG, "Typography":
-                // https://developer.apple.com/design/human-interface-guidelines/typography
+               
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundStyle(.white)
-                // The segment picker has a fixed 214pt width
-                // (it has to sit between the chevron and the
-                // checkmark in the header bar).  At the largest
-                // accessibility sizes a scaled subheadline can
-                // overflow that width — `.minimumScaleFactor(0.7)`
-                // lets the label shrink to 70% of its scaled size
-                // before truncating, and `.lineLimit(1)` keeps it
-                // on a single line.  Apple HIG: "Verify that text
-                // doesn't truncate or clip in your layout, even
-                // at the largest text size."
+               
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -762,28 +653,7 @@ struct CreationView: View {
             .opacity(showEditSheet ? 0 : 1)
             .allowsHitTesting(!showEditSheet)
         }
-        // Per Apple's `SafeAreaRegions` docs, this is an
-        // OptionSet, and a child view's `.ignoresSafeArea(...)`
-        // with explicit regions shadows the parent's setting for
-        // the same edge.  This view needs to opt out of BOTH:
-        //
-        //   • `.container` — to extend the piano past the home
-        //     indicator at the actual screen bottom (an existing
-        //     requirement of the design).
-        //   • `.keyboard` — to keep the layout from compressing
-        //     upward when the save alert's keyboard appears, so
-        //     the toolbar, timeline, and piano stay anchored
-        //     where they were.
-        //
-        // Listing only `.container` here (as an earlier version
-        // did) would shadow the outer `.ignoresSafeArea(.keyboard,
-        // edges: .bottom)` and re-apply the keyboard inset on
-        // this subtree's bottom edge.  Listing both keeps the
-        // parent's keyboard opt-out alive for this child.
-        //
-        // Apple docs:
-        // https://developer.apple.com/documentation/swiftui/safearearegions
-        // https://developer.apple.com/documentation/swiftui/view/ignoressafearea(_:edges:)
+        
         .ignoresSafeArea([.container, .keyboard], edges: .bottom)
         .sheet(isPresented: $showEditSheet,
                onDismiss: { editingRecorder = nil }) {

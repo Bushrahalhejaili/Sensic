@@ -6,13 +6,6 @@
 //
 
 
-//
-//  MainTimelineView.swift
-//  Sensic
-//
-//  Created by Bushra Hatim Alhejaili on 19/05/2026.
-//
-
 
 import SwiftUI
 import UIKit
