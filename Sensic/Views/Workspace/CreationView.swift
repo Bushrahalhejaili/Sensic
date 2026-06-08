@@ -4,7 +4,14 @@
 //  Created by Bushra Hatim Alhejaili on 19/05/2026.
 //
 
+//
+//  CreationView.swift
+//  Sensic
+//  Created by Bushra Hatim Alhejaili on 19/05/2026.
+//
+
 import SwiftUI
+import UIKit
 
 
 // MARK: - CreationView
@@ -101,6 +108,28 @@ struct CreationView: View {
     /// presentation.
     @State private var editingRecorder: TrackRecorder? = nil
 
+    /// Vertical size class — `.compact` on iPhone in landscape,
+    /// `.regular` on iPhone in portrait and on iPad in any
+    /// orientation.  Gates the landscape-only Record-mode layout.
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+
+    /// True only when the timeline area in landscape Record mode
+    /// has been tapped to expand to 293pt.  In that state the
+    /// timeline fills its expanded height, the piano keys are
+    /// hidden, and only the piano scroller stays visible at the
+    /// bottom — tapping the scroller returns the layout to its
+    /// compact 39pt timeline + piano arrangement.
+    @State private var timelineExpanded: Bool = false
+
+    /// iPhone landscape gate.  iPad's size classes are
+    /// `.regular`/`.regular` in landscape so it stays on the
+    /// portrait layout — the design is iPhone-only.  Also gated
+    /// on `activeTab == .record` at every call site since
+    /// landscape is permitted only inside Record mode.
+    private var isLandscape: Bool {
+        verticalSizeClass == .compact
+    }
+
     enum Tab: Hashable { case record, practice }
 
     var body: some View {
@@ -108,18 +137,68 @@ struct CreationView: View {
             Color.black.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                headerBar
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 8)
+                // Landscape Record mode uses a combined single-row
+                // header that folds every toolbar control (undo,
+                // redo, haptic toggle, transport) into the header
+                // strip so the workspace below has the full
+                // remaining height for the timeline + piano.
+                // Every other configuration (portrait Record,
+                // Practice) uses the regular two-row layout where
+                // the toolbar lives inside `recordWorkspace`.
+                Group {
+                    if activeTab == .record && isLandscape {
+                        landscapeRecordHeaderBar
+                    } else {
+                        headerBar
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 8)
 
                 if activeTab == .record {
-                    recordWorkspace
+                    if isLandscape {
+                        recordWorkspaceLandscape
+                    } else {
+                        recordWorkspace
+                    }
                 } else {
                     PracticeView(vm: practiceVM,
                                  scrollState: scrollState)
                 }
             }
+            // Pinning the VStack to the screen's full bounds with
+            // top alignment is what keeps the header rock-stable
+            // when the landscape timeline animates 39pt → 293pt.
+            // Without this, the VStack sizes to its content and
+            // gets centred inside the ZStack — and as the
+            // workspace's content height changes during the
+            // expand animation, the centring point shifts, which
+            // pulls the whole VStack (header included) up and
+            // down by a few pixels.  Filling maxHeight + .top
+            // alignment fixes the header's y-origin at 0 and
+            // makes the workspace absorb every height change
+            // internally via its own Spacer.
+            .frame(maxWidth: .infinity, maxHeight: .infinity,
+                   alignment: .top)
+            // Horizontal safe-area opt-out keeps the header's
+            // BUTTON POSITIONS rock-stable when the landscape edit
+            // sheet appears or disappears.  Without this, adding
+            // the edit-sheet view (which itself uses
+            // `.ignoresSafeArea` to extend edge-to-edge) to the
+            // ZStack alters the safe-area context that this
+            // VStack inherits, and the VStack's resolved width
+            // changes — which then redistributes the Spacers in
+            // the header's HStack and shifts the back / save
+            // buttons inward.  Pinning the VStack to the screen's
+            // physical width here makes its width unconditional,
+            // so the buttons' x-positions are determined purely
+            // by the VStack's own `.padding(.horizontal, 16)`
+            // and the landscape header's internal 20pt padding.
+            //
+            // In portrait this is a no-op (horizontal safe-area
+            // insets are 0 on iPhones in portrait orientation).
+            .ignoresSafeArea(.container, edges: .horizontal)
             // Per Apple's `View.ignoresSafeArea(_:edges:)`
             // documentation, a child view's `ignoresSafeArea`
             // modifier with explicit regions shadows the parent's
@@ -136,6 +215,56 @@ struct CreationView: View {
             // Apple docs:
             // https://developer.apple.com/documentation/swiftui/view/ignoressafearea(_:edges:)
             .ignoresSafeArea(.keyboard, edges: .bottom)
+
+            // Landscape edit-sheet presentation — drawn as a
+            // direct sibling of the header+workspace VStack
+            // inside the body's ZStack rather than as an overlay
+            // on the workspace.  Two reasons:
+            //
+            //   1. Edge-to-edge: anchoring to the workspace
+            //      didn't work because SwiftUI's `.overlay` is
+            //      laid out within the workspace's *layout*
+            //      bounds even when the workspace draws past
+            //      safe area via `.ignoresSafeArea`.  Attached
+            //      to the ZStack instead, the sheet owns its own
+            //      safe-area context and the `.ignoresSafeArea`
+            //      below it makes it span the full device width
+            //      and extend to the screen bottom.
+            //
+            //   2. Header stability: when the sheet was an
+            //      overlay on the workspace, any layout
+            //      reflow the workspace went through on sheet
+            //      show/hide (timeline 41→90, Spacers and piano
+            //      appearing or disappearing) was animated by
+            //      the `.animation(value: showEditSheet)` on
+            //      the workspace — and that reflow was bleeding
+            //      out to the sibling header, shifting its
+            //      buttons inward by a few pixels.  As a sibling
+            //      of the VStack with its own scoped animation,
+            //      the sheet's appearance can't affect the
+            //      header at all.
+            //
+            // The `if let target = editingRecorder` mirrors the
+            // same hydration pattern the old `.sheet` content
+            // closure used.  The `.transition` slides the panel
+            // up from below; the inline `.animation(...)` on the
+            // transition is what fires the slide animation since
+            // `showEditSheet` is flipped from `MainTimelineView`
+            // (outside this view's `withAnimation` scope).
+            if isLandscape && activeTab == .record
+                && showEditSheet, let target = editingRecorder {
+                VStack(spacing: 0) {
+                    Spacer()
+                    landscapeEditSheet(target: target)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .ignoresSafeArea(.container,
+                                 edges: [.horizontal, .bottom])
+                .transition(
+                    .move(edge: .bottom)
+                    .animation(.easeInOut(duration: 0.3))
+                )
+            }
         }
         // Root-level opt-out for the keyboard safe area, per
         // Apple's canonical pattern for views that should stay
@@ -180,6 +309,28 @@ struct CreationView: View {
             if let piece = loadingPiece, savedPieceID == nil {
                 loadPiece(piece)
             }
+
+            // Open up landscape only when entering Record mode.
+            // Practice mode and every other screen in the app
+            // remain portrait-only (see `AppDelegate`).
+            AppOrientation.lock(
+                to: activeTab == .record ? .allButUpsideDown : .portrait)
+        }
+        .onDisappear {
+            // Leaving CreationView (back button, system pop, etc.)
+            // returns the app to the global default of portrait.
+            // If the device happens to be in landscape at the
+            // moment of dismissal, `requestGeometryUpdate` will
+            // rotate it back as the previous screen takes over.
+            AppOrientation.lock(to: .portrait)
+        }
+        .onChange(of: activeTab) { _, newTab in
+            // Switching to Practice mid-session must drop the
+            // landscape allowance immediately and rotate back to
+            // portrait if needed; switching back to Record
+            // re-opens landscape.
+            AppOrientation.lock(
+                to: newTab == .record ? .allButUpsideDown : .portrait)
         }
     }
 
@@ -411,6 +562,92 @@ struct CreationView: View {
         }
     }
 
+    /// Landscape variant of the header bar.  Per the Record-mode
+    /// landscape design (Image 3 of the brief), the layout is:
+    ///
+    ///   back  | ←Spacer→ | undo • redo • haptic • segment • transport | ←Spacer→ | save
+    ///
+    /// Back and save anchor the two edges with their own 20pt
+    /// horizontal inset (on top of the body's 16pt) so they sit
+    /// well clear of the screen corners.  The middle group is a
+    /// nested `HStack(spacing: 10)` so every control inside it
+    /// (the three round buttons, the segment picker, the
+    /// transport bar) shares the same 10pt rhythm and stays
+    /// visually tied to the segment picker rather than drifting
+    /// left.  The two `Spacer(minLength: 0)`s distribute the
+    /// remaining horizontal space equally, centring the middle
+    /// group between back and save.
+    ///
+    /// Only ever used when `activeTab == .record && isLandscape`.
+    /// In every other configuration the regular `headerBar` and
+    /// the in-workspace `toolBar` are used instead.
+    private var landscapeRecordHeaderBar: some View {
+        HStack(spacing: 0) {
+            SensicGlassCircleButton(
+                systemName: "chevron.left",
+                iconSize: 20,
+                iconColor: .white,
+                action: { dismiss() }
+            )
+
+            Spacer(minLength: 0)
+
+            HStack(spacing: 10) {
+                SensicGlassCircleButton(
+                    systemName: "arrow.uturn.backward",
+                    iconSize: 20,
+                    iconColor: recorder.canUndo
+                        ? Color("MainPurple")
+                        : Color("MainPurple").opacity(0.35),
+                    action: { recorder.undoTapped() }
+                )
+
+                SensicGlassCircleButton(
+                    systemName: "arrow.uturn.forward",
+                    iconSize: 20,
+                    iconColor: recorder.canRedo
+                        ? Color("MainPurple")
+                        : Color("MainPurple").opacity(0.35),
+                    action: { recorder.redoTapped() }
+                )
+
+                SensicGlassCircleButton(
+                    systemName: "slider.horizontal.3",
+                    iconSize: 20,
+                    iconColor: showHapticCard ? .white : Color("MainPurple"),
+                    isActive: showHapticCard,
+                    action: {
+                        withAnimation(.spring(response: 0.38,
+                                              dampingFraction: 0.86)) {
+                            showHapticCard.toggle()
+                        }
+                    }
+                )
+
+                segmentPicker
+
+                transportBar
+            }
+
+            Spacer(minLength: 0)
+
+            SensicGlassCircleButton(
+                systemName: "checkmark",
+                iconSize: 20,
+                iconColor: .white,
+                isActive: saveButtonIsActive,
+                action: handleSaveTap
+            )
+        }
+        // Extra horizontal padding on top of the body's 16pt.
+        // 16 + 20 = 36pt from the screen edge to the back and
+        // save buttons, which keeps them clear of the device's
+        // rounded corners (and the dynamic island when the
+        // window scene's safe-area insets are smaller than
+        // expected).
+        .padding(.horizontal, 20)
+    }
+
     @Namespace private var segNamespace
 
     private var segmentPicker: some View {
@@ -558,6 +795,269 @@ struct CreationView: View {
                 EditSheetView(recorder: target)
                     .presentationDetents([.height(322)])
                     .presentationDragIndicator(.visible)
+            }
+        }
+    }
+
+    // MARK: - Workspace (landscape)
+
+    /// Record-mode workspace for iPhone landscape (Image 1–3).
+    /// Three visual states:
+    ///
+    ///   A — default (compact timeline, piano showing):
+    ///       Spacer | timeline | Spacer | scroller 25pt | 5pt | piano 220pt | 5pt
+    ///       (the two Spacers are equal, vertically centring the
+    ///       timeline in the empty area between the header and
+    ///       the scroller.)
+    ///   B — timeline expanded (tap timeline):
+    ///       Spacer | timeline 293pt | Spacer | scroller 25pt | 5pt
+    ///       (Spacers still equal — each ~5pt — so the timeline
+    ///       remains centred even when it nearly fills the
+    ///       workspace.)
+    ///   C — edit sheet open:
+    ///       timeline 87pt | (sheet covers below)
+    ///       (no Spacers — gated on `!showEditSheet` so the
+    ///       timeline anchors at the workspace top and isn't
+    ///       hidden under the 230pt sheet.)
+    ///
+    /// The two `Spacer(minLength: 0)`s do the centring work.
+    /// SwiftUI distributes the workspace's leftover height
+    /// equally between them, so whatever the timeline's
+    /// current height is (41, 87, 293, anything else the
+    /// designer picks later), the gap above it always equals
+    /// the gap below it.  Pinning the workspace to
+    /// `maxHeight: .infinity, alignment: .top` keeps its outer
+    /// height constant across state changes, which is how the
+    /// header above stays put when the user expands the timeline.
+    ///
+    /// The portrait `recordWorkspace` is untouched — landscape
+    /// runs entirely through this branch.
+    private var recordWorkspaceLandscape: some View {
+        VStack(spacing: 0) {
+
+            // State A & B: top half of the centring pair.
+            // Together with the matching Spacer below the
+            // timeline, this splits the workspace's leftover
+            // vertical space evenly, leaving the timeline
+            // visually centred between the header and the
+            // scroller.  Gated on `!showEditSheet` so state C
+            // anchors the timeline at the workspace top instead
+            // of pushing it into the sheet's coverage area.
+            if !showEditSheet {
+                Spacer(minLength: 0)
+            }
+
+            landscapeTimeline
+
+            if !showEditSheet {
+
+                // Bottom half of the centring pair — equal to
+                // the Spacer above the timeline because SwiftUI
+                // splits leftover space evenly between sibling
+                // Spacers.  Replaces the previous fixed 10pt
+                // padding so the gap above and below the
+                // timeline always match.
+                Spacer(minLength: 0)
+
+                // Piano scroller — always visible when the edit
+                // sheet is closed.  In state B it doubles as the
+                // tap target that returns to state A.  Sized to
+                // the landscape dimensions specified in the
+                // design (864 × 25).  The 5pt bottom padding
+                // becomes "gap to piano" in state A and "gap to
+                // screen bottom" in state B, where the scroller
+                // ends up at the workspace's bottom edge.
+                //
+                // `.padding(.bottom, 5)` is applied AFTER the
+                // tap modifiers so the tap region stays bound
+                // to the scroller's own 864×25 rectangle and
+                // doesn't include the gap below it.
+                PianoScroller(scrollState: scrollState, landscape: true)
+                    .frame(width: PianoScroller.landscapeWidth,
+                           height: PianoScroller.landscapeHeight)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if timelineExpanded {
+                            withAnimation(.spring(response: 0.4,
+                                                  dampingFraction: 0.86)) {
+                                timelineExpanded = false
+                            }
+                        }
+                    }
+                    .padding(.bottom, 5)
+
+                // Piano keys — only in state A.  Same dimensions
+                // as portrait (white-key height = 220pt) so the
+                // keys themselves are identical; the keyboard is
+                // wider here because the parent container extends
+                // edge-to-edge, which is what makes more keys
+                // visible at any one time.
+                if !timelineExpanded {
+                    PianoSection(vm: recordVM, scrollState: scrollState)
+                        .frame(height: wKH)
+                        .padding(.bottom, 5)
+                }
+            }
+        }
+        // Workspace fills every pixel the parent VStack gives it
+        // (which is "screen height minus header"), top-aligned so
+        // the haptic card (when shown) anchors at the top while
+        // the Spacer pair below it splits the rest.  Keeping the
+        // workspace's outer height CONSTANT across state changes
+        // is what guarantees the header above never shifts when
+        // the timeline expands.
+        .frame(maxWidth: .infinity, maxHeight: .infinity,
+               alignment: .top)
+        // Haptic settings card in landscape — floats over the
+        // workspace (above the timeline / scroller / piano)
+        // instead of pushing the layout down.  Anchored to the
+        // workspace's top-leading corner because the workspace
+        // already ignores horizontal safe area, so the leading
+        // padding is measured from the screen's leading edge
+        // regardless of any notch / dynamic-island inset.  The
+        // 240pt leading offset roughly lines the card up with
+        // the slider-icon button in the header that triggered
+        // it; the 5pt top offset puts it just below the header
+        // line.  Transition matches the portrait card so the
+        // animation feels consistent between orientations.
+        .overlay(alignment: .topLeading) {
+            if showHapticCard {
+                HapticSettingsCard(settings: hapticSettings)
+                    .padding(.leading, 240)
+                    .padding(.top, 5)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        // Edge-to-edge horizontally so the timeline and piano
+        // span both sides of the screen (per spec), and bottom-
+        // anchored so the piano sits flush with the bottom of
+        // the device.  Keyboard region is opted out for the same
+        // reason as the portrait workspace: keep the layout from
+        // shifting under the save alert's keyboard.
+        .ignoresSafeArea([.container, .keyboard],
+                         edges: [.horizontal, .bottom])
+    }
+
+    /// Custom edit-sheet presentation for landscape Record mode.
+    /// Renders as a `.bottom`-anchored overlay on the workspace
+    /// instead of using SwiftUI's `.sheet`, because `.sheet` in
+    /// landscape on iPhone (regular width × compact height) is
+    /// presented as a centred form-sheet with hard-coded
+    /// horizontal margins, regardless of `.presentationDetents`
+    /// or `.presentationCompactAdaptation(.sheet)`.  By drawing
+    /// our own panel we get edge-to-edge presentation and avoid
+    /// the safe-area inset changes that the form-sheet machinery
+    /// imposes on the underlying view (which were shifting the
+    /// header buttons inward whenever the sheet was shown).
+    ///
+    /// A 20pt drag-handle strip at the top hosts a 36×5 capsule
+    /// indicator and the dismiss `DragGesture`.  Limiting the
+    /// gesture to that strip (via `.contentShape(Rectangle())`
+    /// inside the strip's own bounds) means swiping anywhere on
+    /// the piano roll below doesn't dismiss the sheet — the roll's
+    /// own touch handling stays intact.
+    @ViewBuilder
+    private func landscapeEditSheet(target: TrackRecorder) -> some View {
+        VStack(spacing: 0) {
+
+            // Drag-to-dismiss strip — gesture is scoped to this
+            // 19pt region only, so the piano roll keeps its own
+            // pan / touch gestures uncontested.
+            VStack(spacing: 0) {
+                Capsule()
+                    .fill(Color.white.opacity(0.3))
+                    .frame(width: 36, height: 5)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 6)
+            .padding(.bottom, 8)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture()
+                    .onEnded { value in
+                        // Match the standard sheet's dismiss
+                        // threshold: a downward drag of more
+                        // than ~50pt triggers dismiss.  The
+                        // `.animation` modifier on the workspace
+                        // animates the `.move(edge: .bottom)`
+                        // transition as the flag flips.
+                        if value.translation.height > 50 {
+                            showEditSheet = false
+                        }
+                    }
+            )
+
+            // Piano roll content.  EditSheetView's wrapper view
+            // adds a NavigationStack chrome and a 24pt top
+            // padding that were only there to leave room for the
+            // sheet's navigation bar — since we're not in a
+            // presented sheet, neither is needed here, so
+            // PianoRollView is rendered directly.
+            PianoRollView(recorder: target)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 230)
+        .background(
+            UnevenRoundedRectangle(
+                topLeadingRadius: 16,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 16
+            )
+            .fill(Color("TransparentSpaceBlue"))
+        )
+    }
+
+    /// Timeline section for landscape mode.  Three heights map
+    /// to the three states on `recordWorkspaceLandscape`:
+    ///
+    ///   • edit sheet open  →  87pt — track-band height that
+    ///     leaves room for the 230pt edit sheet below.
+    ///   • expanded         →  293pt — full track with note bars
+    ///     visible.
+    ///   • default          →  39pt — ruler + track header band
+    ///     only.
+    ///
+    /// The `GeometryReader` is what gives the inner
+    /// `MainTimelineView` its width: SwiftUI proposes the
+    /// workspace's full edge-to-edge width to the reader, which
+    /// passes it down as `containerWidth`.  That parameter
+    /// replaces the timeline's hard-coded 402pt portrait width
+    /// so the same view renders edge-to-edge in landscape
+    /// without breaking portrait at the call sites that don't
+    /// pass it.
+    ///
+    /// The whole region is tappable.  A tap on the compact
+    /// timeline triggers the expand transition; the return path
+    /// is via the piano scroller below (so the scroller stays
+    /// reachable in the expanded state).
+    @ViewBuilder
+    private var landscapeTimeline: some View {
+        let height: CGFloat = {
+            if showEditSheet { return 90 }
+            return timelineExpanded ? 293 : 41
+        }()
+
+        GeometryReader { proxy in
+            MainTimelineView(
+                recorder: recorder,
+                pastedTracks: $pastedTracks,
+                showEditSheet: $showEditSheet,
+                editingRecorder: $editingRecorder,
+                containerWidth: proxy.size.width
+            )
+            .frame(width: proxy.size.width,
+                   height: proxy.size.height,
+                   alignment: .top)
+            .clipped()
+        }
+        .frame(height: height)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard !showEditSheet, !timelineExpanded else { return }
+            withAnimation(.spring(response: 0.4,
+                                  dampingFraction: 0.86)) {
+                timelineExpanded = true
             }
         }
     }

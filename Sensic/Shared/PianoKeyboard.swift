@@ -22,6 +22,18 @@
 //
 
 
+//
+//  PianoKeyboard.swift
+//  Sensic
+//
+//  Created by Bushra Hatim Alhejaili on 31/05/2026.
+//
+//  The piano keyboard surface — keys, scroller strip, and the
+//  combined keyboard-plus-scroller view. Shared between Record
+//  mode (in CreationView) and Practice mode.
+//
+
+
 import SwiftUI
 import UIKit
 
@@ -312,13 +324,28 @@ struct PianoSection: UIViewRepresentable {
 struct PianoScroller: View {
     @ObservedObject var scrollState: PianoScrollState
 
-    // Container
+    /// When `true`, the scroller renders at its landscape (Record-mode
+    /// only) dimensions — 864×25 with a wider 217pt picker and chunkier
+    /// 5×15 lines.  Defaults to `false` (portrait 392×45) so every
+    /// existing call site keeps working unchanged.
+    var landscape: Bool = false
+
+    // ─────────────────────────────────────────────
+    // Container — portrait
+    // ─────────────────────────────────────────────
     static let width: CGFloat        = 392
     static let height: CGFloat       = 45
     static let cornerRadius: CGFloat = 20
     static let strokeWidth: CGFloat  = 1
 
-    // Lines
+    // Container — landscape (per the Record-mode design spec)
+    static let landscapeWidth: CGFloat        = 864
+    static let landscapeHeight: CGFloat       = 25
+    static let landscapeCornerRadius: CGFloat = 12
+
+    // ─────────────────────────────────────────────
+    // Lines — portrait
+    // ─────────────────────────────────────────────
     static let lineHeight: CGFloat       = 25
     static let lineWidth: CGFloat        = 2
     /// Center-to-center distance between adjacent lines inside a group.
@@ -330,11 +357,52 @@ struct PianoScroller: View {
     /// rectangle's leading edge. Mirrored on the right side.
     static let firstLineInset: CGFloat   = 29
 
-    // Picker (viewport indicator)
+    // Lines — landscape
+    //
+    // The line dimensions are an explicit spec from the design:
+    // each line is 5pt wide and 15pt tall (taller capsule pill on a
+    // shorter strip).  The horizontal spacings (`first inset`,
+    // intra-group, inter-group) are scaled from the portrait values
+    // by the container-width ratio so the same 8-group, 52-line
+    // layout fills the wider rectangle without crowding or gaps.
+    static let landscapeLineHeight: CGFloat = 15
+    static let landscapeLineWidth: CGFloat  = 5
+    private static let landscapeScale: CGFloat
+        = landscapeWidth / width                         //   ≈ 2.204
+    static let landscapeIntraGroupStride: CGFloat
+        = intraGroupStride * landscapeScale              //   ≈ 13.22
+    static let landscapeInterGroupStride: CGFloat
+        = interGroupStride * landscapeScale              //   ≈ 22.04
+    static let landscapeFirstLineInset: CGFloat
+        = firstLineInset * landscapeScale                //   ≈ 63.92
+
+    // ─────────────────────────────────────────────
+    // Picker (viewport indicator) — portrait
+    // ─────────────────────────────────────────────
     static let pickerWidth: CGFloat        = 46
     static let pickerHeight: CGFloat       = 45
     static let pickerCornerRadius: CGFloat = 14
     static let pickerStrokeWidth: CGFloat  = 2
+
+    // Picker — landscape
+    static let landscapePickerWidth: CGFloat        = 217
+    static let landscapePickerHeight: CGFloat       = 25
+    static let landscapePickerCornerRadius: CGFloat = 10
+
+    // ─────────────────────────────────────────────
+    // Effective dimensions — selected by `landscape`
+    // ─────────────────────────────────────────────
+    private var effectiveWidth: CGFloat        { landscape ? Self.landscapeWidth : Self.width }
+    private var effectiveHeight: CGFloat       { landscape ? Self.landscapeHeight : Self.height }
+    private var effectiveCornerRadius: CGFloat { landscape ? Self.landscapeCornerRadius : Self.cornerRadius }
+    private var effectiveLineHeight: CGFloat   { landscape ? Self.landscapeLineHeight : Self.lineHeight }
+    private var effectiveLineWidth: CGFloat    { landscape ? Self.landscapeLineWidth : Self.lineWidth }
+    private var effectiveIntraStride: CGFloat  { landscape ? Self.landscapeIntraGroupStride : Self.intraGroupStride }
+    private var effectiveInterStride: CGFloat  { landscape ? Self.landscapeInterGroupStride : Self.interGroupStride }
+    private var effectiveFirstInset: CGFloat   { landscape ? Self.landscapeFirstLineInset : Self.firstLineInset }
+    private var effectivePickerWidth: CGFloat        { landscape ? Self.landscapePickerWidth : Self.pickerWidth }
+    private var effectivePickerHeight: CGFloat       { landscape ? Self.landscapePickerHeight : Self.pickerHeight }
+    private var effectivePickerCornerRadius: CGFloat { landscape ? Self.landscapePickerCornerRadius : Self.pickerCornerRadius }
 
     /// 8 groups: seven of 7 lines, the last of 3.  Total = 7×7 + 3 = 52.
     private static let groupSizes: [Int] = [7, 7, 7, 7, 7, 7, 7, 3]
@@ -342,23 +410,25 @@ struct PianoScroller: View {
     /// The 3rd line of every group (zero-indexed = 2) is a C note.
     private static let cIndexInGroup = 2
 
-    /// Pre-computed (x-center, isC) for each of the 52 lines.
-    private static let lineLayout: [(x: CGFloat, isC: Bool)] = {
+    /// (x-center, isC) for each of the 52 lines.  Per-instance
+    /// because the spacings now depend on `landscape`.
+    private var lineLayout: [(x: CGFloat, isC: Bool)] {
         var out: [(CGFloat, Bool)] = []
-        var x = firstLineInset
-        for (gi, count) in groupSizes.enumerated() {
+        var x = effectiveFirstInset
+        for (gi, count) in Self.groupSizes.enumerated() {
             for li in 0..<count {
-                out.append((x, li == cIndexInGroup))
-                if li < count - 1 { x += intraGroupStride }
+                out.append((x, li == Self.cIndexInGroup))
+                if li < count - 1 { x += effectiveIntraStride }
             }
-            if gi < groupSizes.count - 1 { x += interGroupStride }
+            if gi < Self.groupSizes.count - 1 { x += effectiveInterStride }
         }
         return out
-    }()
+    }
 
     /// Travel range for the picker's center, in container coordinates.
-    private static let pickerMinX: CGFloat = pickerWidth / 2
-    private static let pickerMaxX: CGFloat = width - pickerWidth / 2
+    /// Per-instance for the same reason as `lineLayout`.
+    private var pickerMinX: CGFloat { effectivePickerWidth / 2 }
+    private var pickerMaxX: CGFloat { effectiveWidth - effectivePickerWidth / 2 }
 
     /// Captured normalized offset at the moment a drag begins, so
     /// `gesture.translation` can be added to a stable starting point.
@@ -368,23 +438,23 @@ struct PianoScroller: View {
         ZStack {
             // Background fill
             RoundedRectangle(
-                cornerRadius: Self.cornerRadius,
+                cornerRadius: effectiveCornerRadius,
                 style: .continuous
             )
             .fill(Color("Navy"))
 
             // 52 vertical lines (50 MainPurple + 8 white Cs)
-            ForEach(0..<Self.lineLayout.count, id: \.self) { i in
-                let cfg = Self.lineLayout[i]
+            ForEach(0..<lineLayout.count, id: \.self) { i in
+                let cfg = lineLayout[i]
                 Capsule()
                     .fill(cfg.isC ? Color.white : Color("MainPurple"))
-                    .frame(width: Self.lineWidth, height: Self.lineHeight)
-                    .position(x: cfg.x, y: Self.height / 2)
+                    .frame(width: effectiveLineWidth, height: effectiveLineHeight)
+                    .position(x: cfg.x, y: effectiveHeight / 2)
             }
 
             // Border on top so it remains crisp over the lines
             RoundedRectangle(
-                cornerRadius: Self.cornerRadius,
+                cornerRadius: effectiveCornerRadius,
                 style: .continuous
             )
             .strokeBorder(Color("MainPurple"), lineWidth: Self.strokeWidth)
@@ -392,12 +462,12 @@ struct PianoScroller: View {
             // Viewport picker, on top of everything
             picker
         }
-        .frame(width: Self.width, height: Self.height)
+        .frame(width: effectiveWidth, height: effectiveHeight)
         // Clip to the container so the picker can travel flush to the
         // edges without poking past the rounded corners.
         .clipShape(
             RoundedRectangle(
-                cornerRadius: Self.cornerRadius,
+                cornerRadius: effectiveCornerRadius,
                 style: .continuous
             )
         )
@@ -410,17 +480,16 @@ struct PianoScroller: View {
     /// updates that offset which in turn scrolls the keyboard.
     private var picker: some View {
         let norm = max(0, min(1, scrollState.normalizedOffset))
-        let centerX = Self.pickerMinX
-            + norm * (Self.pickerMaxX - Self.pickerMinX)
+        let centerX = pickerMinX + norm * (pickerMaxX - pickerMinX)
 
         return RoundedRectangle(
-            cornerRadius: Self.pickerCornerRadius,
+            cornerRadius: effectivePickerCornerRadius,
             style: .continuous
         )
         .fill(Color.gray.opacity(0.08))
         .overlay(
             RoundedRectangle(
-                cornerRadius: Self.pickerCornerRadius,
+                cornerRadius: effectivePickerCornerRadius,
                 style: .continuous
             )
             .strokeBorder(
@@ -428,15 +497,15 @@ struct PianoScroller: View {
                 lineWidth: Self.pickerStrokeWidth
             )
         )
-        .frame(width: Self.pickerWidth, height: Self.pickerHeight)
-        .position(x: centerX, y: Self.height / 2)
+        .frame(width: effectivePickerWidth, height: effectivePickerHeight)
+        .position(x: centerX, y: effectiveHeight / 2)
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { gesture in
                     if dragStartNorm == nil {
                         dragStartNorm = scrollState.normalizedOffset
                     }
-                    let travel = Self.pickerMaxX - Self.pickerMinX
+                    let travel = pickerMaxX - pickerMinX
                     let delta  = gesture.translation.width / travel
                     let newNorm = (dragStartNorm ?? 0) + delta
                     scrollState.setNormalizedOffset(

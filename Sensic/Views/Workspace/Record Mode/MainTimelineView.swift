@@ -6,6 +6,14 @@
 //
 
 
+//
+//  MainTimelineView.swift
+//  Sensic
+//
+//  Created by Bushra Hatim Alhejaili on 19/05/2026.
+//
+
+
 import SwiftUI
 import UIKit
 
@@ -344,6 +352,30 @@ struct MainTimelineView: View {
     /// before SwiftUI builds the sheet's content.
     @Binding var editingRecorder: TrackRecorder?
 
+    /// Width of the timeline's outer container, in points.
+    /// Defaults to portrait's 402pt so every existing call site
+    /// keeps its current sizing.  `CreationView`'s landscape
+    /// Record-mode layout passes the device's full landscape
+    /// width here so the timeline can extend edge-to-edge per
+    /// the design (Image 1).
+    ///
+    /// Internally this replaces every reference to
+    /// `TLLayout.containerWidth` / `TLLayout.topBarWidth` (which
+    /// were the hard-coded 402pt) so the outer container, top
+    /// bar, scrollable grid, and playhead layer all scale to the
+    /// new width together.
+    var containerWidth: CGFloat = TLLayout.containerWidth
+
+    /// Width of the inner ruler strip — the slightly inset strip
+    /// behind the playhead handle.  Scales with `containerWidth`
+    /// using the same 22pt under-extension as portrait (where
+    /// 402 − 380 = 22), so the playhead handle never overruns the
+    /// rounded corners regardless of how wide the container gets.
+    private var innerStripWidth: CGFloat {
+        containerWidth
+            - (TLLayout.containerWidth - TLLayout.innerStripWidth)
+    }
+
     private let tickColor = Color.indigoBlue
     private let gridColor = Color.gray.opacity(0.2)
     private let playheadLineColor = Color.lavender    // asset "Lavender"
@@ -395,8 +427,8 @@ struct MainTimelineView: View {
         TLMetrics(pixelsPerBar: pixelsPerBar)
     }
     private var stripWidth: CGFloat {
-        scrollOffsetX > 0 ? TLLayout.containerWidth
-                          : TLLayout.innerStripWidth
+        scrollOffsetX > 0 ? containerWidth
+                          : innerStripWidth
     }
 
     private func spaceBlueShadowed<S: Shape>(_ shape: S) -> some View {
@@ -794,7 +826,7 @@ struct MainTimelineView: View {
             ZStack(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: TLLayout.containerRadius)
                     .fill(Color("TransparentSpaceBlue"))
-                    .frame(width: TLLayout.containerWidth,
+                    .frame(width: containerWidth,
                            height: TLLayout.containerHeight)
 
                 spaceBlueShadowed(
@@ -804,21 +836,21 @@ struct MainTimelineView: View {
                         bottomTrailingRadius: 0,
                         topTrailingRadius: TLLayout.containerRadius)
                 )
-                .frame(width: TLLayout.topBarWidth,
+                .frame(width: containerWidth,
                        height: TLLayout.topBarHeight)
 
                 spaceBlueShadowed(Rectangle())
                     .frame(width: stripWidth,
                            height: TLLayout.innerStripHeight)
-                    .frame(width: TLLayout.containerWidth,
+                    .frame(width: containerWidth,
                            alignment: .topTrailing)
 
                 scrollableGrid
-                    .frame(width: TLLayout.containerWidth,
+                    .frame(width: containerWidth,
                            height: TLLayout.containerHeight,
                            alignment: .topTrailing)
             }
-            .frame(width: TLLayout.containerWidth,
+            .frame(width: containerWidth,
                    height: TLLayout.containerHeight)
             .compositingGroup()
             .clipShape(RoundedRectangle(
@@ -831,13 +863,13 @@ struct MainTimelineView: View {
                             stripWidth: stripWidth,
                             lineColor: playheadLineColor,
                             fillColor: playheadFillColor)
-                .frame(width: TLLayout.containerWidth,
+                .frame(width: containerWidth,
                        height: TLLayout.containerHeight,
                        alignment: .topTrailing)
                 .clipShape(RoundedRectangle(
                     cornerRadius: TLLayout.containerRadius))
         }
-        .frame(width: TLLayout.containerWidth,
+        .frame(width: containerWidth,
                height: TLLayout.containerHeight)
         .onReceive(recorder.$playheadSeconds) { seconds in
             // While the recorder is advancing the playhead, push
