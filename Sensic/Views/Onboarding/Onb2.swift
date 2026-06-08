@@ -56,7 +56,7 @@ struct Onb2: View {
                         }
                     } 
                     .padding(.horizontal, 28)
-                    .padding(.top, 30)
+                    .padding(.top, 40)
 
                     Spacer()
                     
